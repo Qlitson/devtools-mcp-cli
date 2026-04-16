@@ -1,6 +1,10 @@
 {
   "name": "devtools-mcp-server",
   "version": "1.0.0",
+  "scripts": {
+    "start:mcp": "node mcp.js",
+    "start:http": "node http.js"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "express": "^5.0.0",

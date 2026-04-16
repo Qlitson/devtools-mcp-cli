@@ -4,7 +4,7 @@
       "type": "stdio",
       "command": "node",
       "args": [
-        "/ABSOLUTE/PATH/TO/devtools-mcp-cli/server/index.js"
+        "/ABSOLUTE/PATH/TO/devtools-mcp-cli/server/mcp.js"
       ],
       "env": {}
     }

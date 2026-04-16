@@ -18,18 +18,29 @@ DevTools ↔ 本地服务 ↔ Claude CLI 双向打通
 - 执行结果自动回传 AI，形成调试→修复→测试闭环
 
 ## 🧱 架构
-Chrome 扩展 ←→ 本地 Node 服务 ←→ Claude CLI (MCP)
+Chrome 扩展 ←→ 本地 HTTP Bridge 服务
+Claude CLI (MCP) ←→ 本地 MCP Stdio 服务
+
+两个服务通过本地共享状态通信，互不抢端口。
 
 ## 🚀 快速开始（macOS）
 ### 1. 安装依赖
 cd server
 npm install
 
-### 2. 配置 Claude Code MCP（推荐：项目级 `.mcp.json`）
+### 2. 启动本地 HTTP Bridge（给浏览器插件用）
+```bash
+cd server
+npm run start:http
+```
+
+默认监听：`http://127.0.0.1:55666`
+
+### 3. 配置 Claude Code MCP（推荐：项目级 `.mcp.json`）
 推荐用命令行配置（会在项目根目录生成/更新 `.mcp.json`）：
 
 ```bash
-claude mcp add --scope project --transport stdio devtools -- node /绝对路径/devtools-mcp-cli/server/index.js
+claude mcp add --scope project --transport stdio devtools -- node /绝对路径/devtools-mcp-cli/server/mcp.js
 ```
 
 重要：`.mcp.json` 里通常包含你本机的绝对路径，**开源仓库不要提交它**。建议把它当作本地文件（本仓库已在 `.gitignore` 忽略了 `.mcp.json`）。
@@ -41,20 +52,20 @@ claude mcp add --scope project --transport stdio devtools -- node /绝对路径/
   "mcpServers": {
     "devtools": {
       "command": "node",
-      "args": ["/绝对路径/devtools-mcp-cli/server/index.js"]
+      "args": ["/绝对路径/devtools-mcp-cli/server/mcp.js"]
     }
   }
 }
 ```
 
-提示：这个 MCP server 进程会同时启动 HTTP 服务（默认 `http://127.0.0.1:55666`），所以**不要再单独**运行 `node server/index.js`，否则会端口冲突。
+提示：MCP 与 HTTP 现已拆分。你需要保持 HTTP Bridge 进程运行，MCP 由 Claude CLI 按需拉起。
 
-### 3. 安装 Chrome 扩展
+### 4. 安装 Chrome 扩展
 1. 打开 chrome://extensions/
 2. 开启开发者模式
 3. 加载已解压扩展程序 → 选择 extension 文件夹
 
-### 4. 开始使用
+### 5. 开始使用
 1. 终端运行：claude
 2. 对 Claude 说：持续调用 getDevToolsTask，有指令自动修改代码
 3. 页面右键元素 → 发送到 Claude CLI

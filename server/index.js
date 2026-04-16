@@ -7,6 +7,16 @@ const z = require("zod");
 
 const app = express();
 app.use(express.json());
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
 
 const HTTP_HOST = process.env.DEVTOOLS_HTTP_HOST || "127.0.0.1";
 const HTTP_PORT = Number.parseInt(process.env.DEVTOOLS_HTTP_PORT || "55666", 10);

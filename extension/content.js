@@ -1,6 +1,8 @@
 let pressTimer;
 let targetEl;
 
+const DEVTOOLS_HTTP_BASE = "http://127.0.0.1:55555";
+
 document.addEventListener("mousedown", startPress);
 document.addEventListener("touchstart", startPress);
 document.addEventListener("mouseup", clearPress);
@@ -74,7 +76,7 @@ function cssEscape(value) {
 
 // 监听页面错误
 window.addEventListener('error', (e) => {
-  fetch('http://localhost:55555/from-devtools', {
+  fetch(`${DEVTOOLS_HTTP_BASE}/from-devtools`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -90,7 +92,7 @@ window.addEventListener('error', (e) => {
 });
 
 window.addEventListener('unhandledrejection', (e) => {
-  fetch('http://localhost:55555/from-devtools', {
+  fetch(`${DEVTOOLS_HTTP_BASE}/from-devtools`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -105,7 +107,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // 轮询执行 AI 下发的测试步骤
 async function pollAndRunTestSteps() {
   try {
-    const res = await fetch('http://localhost:55555/get-browser-test-steps');
+    const res = await fetch(`${DEVTOOLS_HTTP_BASE}/get-browser-test-steps`);
     const steps = await res.json();
     if (!steps || steps.length === 0) return;
 
@@ -151,7 +153,7 @@ async function pollAndRunTestSteps() {
       }
     }
 
-    await fetch('http://localhost:55555/browser-test-result', {
+    await fetch(`${DEVTOOLS_HTTP_BASE}/browser-test-result`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ results })

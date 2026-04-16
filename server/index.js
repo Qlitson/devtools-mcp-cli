@@ -8,6 +8,9 @@ const z = require("zod");
 const app = express();
 app.use(express.json());
 
+const HTTP_HOST = process.env.DEVTOOLS_HTTP_HOST || "127.0.0.1";
+const HTTP_PORT = Number.parseInt(process.env.DEVTOOLS_HTTP_PORT || "55555", 10);
+
 let lastTask = null;
 let browserTestSteps = null;
 
@@ -72,8 +75,14 @@ app.post("/browser-test-result", (req, res) => {
 // 4. 同时启动 Express + MCP Stdio
 async function start() {
   // 启动 HTTP
-  app.listen(55555, () => {
-    console.log("服务已启动: http://localhost:55555");
+  const httpServer = app.listen(HTTP_PORT, HTTP_HOST);
+  httpServer.on("listening", () => {
+    const addr = httpServer.address();
+    console.log("服务已启动:", addr);
+    console.log(`服务地址: http://${HTTP_HOST}:${HTTP_PORT}`);
+  });
+  httpServer.on("error", (err) => {
+    console.error("HTTP 服务启动失败:", err);
   });
 
   // 启动 MCP Stdio 传输

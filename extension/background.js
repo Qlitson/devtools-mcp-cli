@@ -16,6 +16,8 @@ chrome.runtime.onMessage.addListener(async (msg, sender) => {
   if (msg.type === "longPress" && sender?.tab?.id) await sendTask(sender.tab.id);
 });
 
+const DEVTOOLS_HTTP_BASE = "http://127.0.0.1:55555";
+
 async function sendTask(tabId) {
   const target =
     (await chrome.tabs.sendMessage(tabId, { type: "devtools:getTarget" }).catch(() => null)) ||
@@ -31,7 +33,7 @@ async function sendTask(tabId) {
   if (!promptText) return;
 
   try {
-    await fetch("http://localhost:55555/from-devtools", {
+    await fetch(`${DEVTOOLS_HTTP_BASE}/from-devtools`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

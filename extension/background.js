@@ -9,19 +9,22 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== "sendToCLI") return;
   if (!tab?.id) return;
-  await sendTask(tab.id);
+  await sendTask(tab.id, info);
 });
 
 const DEVTOOLS_HTTP_BASE = "http://127.0.0.1:55666";
 
-async function sendTask(tabId) {
+async function sendTask(tabId, clickInfo = {}) {
   const target =
     (await chrome.tabs.sendMessage(tabId, { type: "devtools:getTarget" }).catch(() => null)) ||
     (await getTargetByInjectedScript(tabId));
 
   const html = target?.html || "";
   if (!html) {
-    await alertInPage(tabId, "请先右键目标元素后再发送");
+    await alertInPage(
+      tabId,
+      "未捕获到目标元素。请在页面内容区域右键元素后，再点“发送到 Claude CLI”。",
+    );
     return;
   }
 
@@ -37,6 +40,7 @@ async function sendTask(tabId) {
         prompt: promptText,
         url: target?.url || "",
         selector: target?.selector || "",
+        clickInfo,
       }),
     });
     await alertInPage(tabId, "已发送到本地服务");
@@ -66,11 +70,12 @@ async function getTargetByInjectedScript(tabId) {
   const [result] = await chrome.scripting.executeScript({
     target: { tabId },
     func: () => {
-      const target = window.__devtoolsMcpLastTarget;
+      const target = document.activeElement;
       return {
         html: target?.outerHTML || "",
         url: location.href,
         selector: "",
+        reason: "injected_fallback",
       };
     },
   });

@@ -1,18 +1,41 @@
 const DEVTOOLS_HTTP_BASE = "http://127.0.0.1:55666";
+let lastContextTarget = null;
+let lastPointerTarget = null;
+let lastPointer = null;
+
+document.addEventListener("mousedown", (e) => {
+  lastPointerTarget = e.target;
+  lastPointer = { x: e.clientX, y: e.clientY };
+});
 
 document.addEventListener("contextmenu", (e) => {
-  window.__devtoolsMcpLastTarget = e.target;
+  lastContextTarget = e.target;
+  lastPointer = { x: e.clientX, y: e.clientY };
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type !== "devtools:getTarget") return;
-  const el = window.__devtoolsMcpLastTarget;
+  const el = resolveCapturedElement();
   sendResponse({
     html: el?.outerHTML || "",
     url: location.href,
     selector: el ? buildSelector(el) : "",
+    reason: el ? "captured" : "none",
   });
 });
+
+function resolveCapturedElement() {
+  if (lastContextTarget instanceof Element) return lastContextTarget;
+  if (lastPointerTarget instanceof Element) return lastPointerTarget;
+  if (lastPointer) {
+    const pointed = document.elementFromPoint(lastPointer.x, lastPointer.y);
+    if (pointed instanceof Element) return pointed;
+  }
+  if (document.activeElement instanceof Element && document.activeElement !== document.body) {
+    return document.activeElement;
+  }
+  return null;
+}
 
 function buildSelector(el) {
   if (!(el instanceof Element)) return "";

@@ -61,7 +61,16 @@ mcpServer.registerTool(
 // 3. 浏览器接口（不变）
 app.post("/from-devtools", (req, res) => {
   lastTask = req.body;
-  console.log("✅ 收到 DevTools 指令");
+  const type = req.body?.type || "user_prompt";
+  const selector = req.body?.selector || "";
+  const prompt = req.body?.prompt ? String(req.body.prompt).slice(0, 120) : "";
+  const url = req.body?.url || "";
+  console.log("✅ 收到 DevTools 指令:", {
+    type,
+    selector,
+    url,
+    promptPreview: prompt,
+  });
   res.json({ ok: true });
 });
 

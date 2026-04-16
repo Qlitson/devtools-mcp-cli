@@ -15,7 +15,7 @@ app.use((req, res, next) => {
 });
 
 const HTTP_HOST = process.env.DEVTOOLS_HTTP_HOST || "127.0.0.1";
-const HTTP_PORT = Number.parseInt(process.env.DEVTOOLS_HTTP_PORT || "55666", 10);
+const HTTP_PORT = Number.parseInt(process.env.DEVTOOLS_HTTP_PORT || "55667", 10);
 
 app.post("/from-devtools", async (req, res) => {
   await setLastTask(req.body);

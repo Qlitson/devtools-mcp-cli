@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "start:mcp": "node mcp.js",
-    "start:http": "node http.js"
+    "start:http": "node http.js",
+    "start:channel": "node channel.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

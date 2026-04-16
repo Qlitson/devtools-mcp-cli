@@ -7,6 +7,14 @@
         "/ABSOLUTE/PATH/TO/devtools-mcp-cli/server/mcp.js"
       ],
       "env": {}
+    },
+    "devtools-channel": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/ABSOLUTE/PATH/TO/devtools-mcp-cli/server/channel.js"
+      ],
+      "env": {}
     }
   }
 }

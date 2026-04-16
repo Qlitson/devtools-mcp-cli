@@ -18,47 +18,45 @@ DevTools ↔ 本地服务 ↔ Claude CLI 双向打通
 - 执行结果自动回传 AI，形成调试→修复→测试闭环
 
 ## 🧱 架构
-Chrome 扩展 ←→ 本地 HTTP Bridge 服务
-Claude CLI (MCP) ←→ 本地 MCP Stdio 服务
+Chrome 扩展 ←→ `server/channel.js`（本机 HTTP，默认 `127.0.0.1:55666`）
+`server/channel.js` → Claude Code（**Channel 推送**：`notifications/claude/channel`）
 
-两个服务通过本地共享状态通信，互不抢端口。
+工具侧（可选，用于拉取/长轮询任务队列）：
+Claude Code (MCP) ←→ `server/mcp.js`（`getDevToolsTask` / `waitForDevToolsTask`）
+
+说明：
+- **推荐**：用 Channel 推送后，Claude 不必高频轮询工具也能“收到事件”。
+- `channel.js` 仍会写入 `server/.runtime/state.json`，因此你依然可以用 `mcp.js` 的工具做队列消费/调试。
 
 ## 🚀 快速开始（macOS）
 ### 1. 安装依赖
 cd server
 npm install
 
-### 2. 启动本地 HTTP Bridge（给浏览器插件用）
-```bash
-cd server
-npm run start:http
-```
-
-默认监听：`http://127.0.0.1:55666`
-
-### 3. 配置 Claude Code MCP（推荐：项目级 `.mcp.json`）
-推荐用命令行配置（会在项目根目录生成/更新 `.mcp.json`）：
+### 2. 配置 Claude Code MCP（推荐：项目级 `.mcp.json`）
+你需要 **两个 MCP server 条目**（名字可自定义，但下文 `--dangerously-load-development-channels` 要与这里一致）：
 
 ```bash
 claude mcp add --scope project --transport stdio devtools -- node /绝对路径/devtools-mcp-cli/server/mcp.js
+claude mcp add --scope project --transport stdio devtools-channel -- node /绝对路径/devtools-mcp-cli/server/channel.js
 ```
 
 重要：`.mcp.json` 里通常包含你本机的绝对路径，**开源仓库不要提交它**。建议把它当作本地文件（本仓库已在 `.gitignore` 忽略了 `.mcp.json`）。
 
-也可以复制 `.mcp.json.example`，改成你本机路径后保存为 `.mcp.json`：
+也可以复制 `.mcp.json.example`，改成你本机路径后保存为 `.mcp.json`。
 
-```json
-{
-  "mcpServers": {
-    "devtools": {
-      "command": "node",
-      "args": ["/绝对路径/devtools-mcp-cli/server/mcp.js"]
-    }
-  }
-}
+### 3. 用 Channel 启动 Claude Code（自定义 channel 需要 development flag）
+Channels 属于 research preview；自建 channel 在预览期通常需要 `--dangerously-load-development-channels`（详见官方文档：[Channels reference](https://code.claude.com/docs/en/channels-reference.md)）。
+
+示例（同时加载 channel + 工具 MCP）：
+
+```bash
+claude --dangerously-load-development-channels server:devtools-channel server:devtools
 ```
 
-提示：MCP 与 HTTP 现已拆分。你需要保持 HTTP Bridge 进程运行，MCP 由 Claude CLI 按需拉起。
+注意：**不要**再手动 `node server/channel.js` 起第二个进程（会端口冲突）。Claude Code 会 spawn 这个子进程并拉起其中的 HTTP 监听。
+
+在 Claude Code 完成与该子进程的 stdio 连接之前，插件请求可能会短暂返回 `503 channel_not_ready`（重试即可）。
 
 ### 4. 安装 Chrome 扩展
 1. 打开 chrome://extensions/
@@ -66,10 +64,20 @@ claude mcp add --scope project --transport stdio devtools -- node /绝对路径/
 3. 加载已解压扩展程序 → 选择 extension 文件夹
 
 ### 5. 开始使用
-1. 终端运行：claude
-2. 对 Claude 说：循环调用 `waitForDevToolsTask`（例如 `timeoutMs=30000`），有任务就处理；或单次调用 `getDevToolsTask` 拉取队列
-3. 页面右键元素 → 发送到 Claude CLI
+1. 按上一节用 `--dangerously-load-development-channels ...` 启动 `claude` 并保持会话打开
+2. 页面右键元素 → 发送到 Claude CLI（事件会以 channel 形式进入会话）
+3. （可选）如果你仍希望走“队列拉取”，可以让 Claude 调用 `waitForDevToolsTask` / `getDevToolsTask`
 4. 或让 AI 读取 Playwright 用例并下发到浏览器执行
+
+### 兼容：仅 HTTP 桥接（不走 Channel）
+如果你暂时不想启用 channels，可以单独跑旧版 HTTP bridge（默认端口 **55667**，避免与 channel 的 **55666** 冲突）：
+
+```bash
+cd server
+npm run start:http
+```
+
+同时你需要把扩展里的 `55666` 改成 `55667`（或设置环境变量 `DEVTOOLS_HTTP_PORT` 并同步扩展）。
 
 ## 🤖 AI 自动执行 Playwright 用例
 让 Claude 读取你的 .spec.js 测试用例，提取操作步骤后调用：

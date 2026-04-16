@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 
 const HTTP_HOST = process.env.DEVTOOLS_HTTP_HOST || "127.0.0.1";
-const HTTP_PORT = Number.parseInt(process.env.DEVTOOLS_HTTP_PORT || "55555", 10);
+const HTTP_PORT = Number.parseInt(process.env.DEVTOOLS_HTTP_PORT || "55666", 10);
 
 let lastTask = null;
 let browserTestSteps = null;
@@ -74,15 +74,24 @@ app.post("/browser-test-result", (req, res) => {
 
 // 4. 同时启动 Express + MCP Stdio
 async function start() {
-  // 启动 HTTP
-  const httpServer = app.listen(HTTP_PORT, HTTP_HOST);
-  httpServer.on("listening", () => {
-    const addr = httpServer.address();
-    console.log("服务已启动:", addr);
-    console.log(`服务地址: http://${HTTP_HOST}:${HTTP_PORT}`);
+  // 先确保 HTTP 真正监听成功；失败时直接抛错终止进程。
+  const httpServer = await new Promise((resolve, reject) => {
+    const server = app.listen(HTTP_PORT, HTTP_HOST);
+    server.once("error", (err) => {
+      reject(err);
+    });
+    server.once("listening", () => {
+      resolve(server);
+    });
   });
+
+  const addr = httpServer.address();
+  console.log("服务已启动:", addr);
+  console.log(`服务地址: http://${HTTP_HOST}:${HTTP_PORT}`);
+
   httpServer.on("error", (err) => {
-    console.error("HTTP 服务启动失败:", err);
+    console.error("HTTP 服务运行异常，进程即将退出:", err);
+    process.exit(1);
   });
 
   // 启动 MCP Stdio 传输
@@ -90,4 +99,7 @@ async function start() {
   await mcpServer.connect(transport);
 }
 
-start().catch(console.error);
+start().catch((err) => {
+  console.error("服务启动失败:", err);
+  process.exit(1);
+});

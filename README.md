@@ -47,7 +47,7 @@ claude mcp add --scope project --transport stdio devtools -- node /绝对路径/
 }
 ```
 
-提示：这个 MCP server 进程会同时启动 HTTP 服务（`http://localhost:55555`），所以**不要再单独**运行 `node server/index.js`，否则会端口冲突。
+提示：这个 MCP server 进程会同时启动 HTTP 服务（默认 `http://127.0.0.1:55666`），所以**不要再单独**运行 `node server/index.js`，否则会端口冲突。
 
 ### 3. 安装 Chrome 扩展
 1. 打开 chrome://extensions/

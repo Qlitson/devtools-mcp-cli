@@ -1,7 +1,7 @@
 let pressTimer;
 let targetEl;
 
-const DEVTOOLS_HTTP_BASE = "http://127.0.0.1:55555";
+const DEVTOOLS_HTTP_BASE = "http://127.0.0.1:55666";
 
 document.addEventListener("mousedown", startPress);
 document.addEventListener("touchstart", startPress);

@@ -49,6 +49,7 @@ server.assertNotificationCapability = function (method) {
 
 const app = express();
 let channelTransportReady = false;
+let lastChannelPushError = null;
 app.use(express.json({ limit: "2mb" }));
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -62,18 +63,34 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
+  if (req.path === "/channel-health") return next();
+  if (req.method === "GET" && req.path === "/get-browser-test-steps") return next();
   if (channelTransportReady) return next();
   res.status(503).json({ ok: false, error: "channel_not_ready" });
 });
 
-async function pushChannelEvent(content, meta) {
-  await server.notification({
-    method: "notifications/claude/channel",
-    params: {
-      content,
-      meta,
-    },
+app.get("/channel-health", (_req, res) => {
+  res.json({
+    ok: true,
+    channelTransportReady,
+    lastChannelPushError,
   });
+});
+
+async function pushChannelEvent(content, meta) {
+  try {
+    await server.notification({
+      method: "notifications/claude/channel",
+      params: {
+        content,
+        meta,
+      },
+    });
+    lastChannelPushError = null;
+  } catch (err) {
+    lastChannelPushError = String(err?.message || err);
+    console.error("Channel 推送失败:", err);
+  }
 }
 
 app.post("/from-devtools", async (req, res) => {

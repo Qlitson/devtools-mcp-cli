@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "devtools": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/ABSOLUTE/PATH/TO/devtools-mcp-cli/server/index.js"
+      ],
+      "env": {}
+    }
+  }
+}

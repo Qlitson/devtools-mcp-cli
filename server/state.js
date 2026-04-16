@@ -69,6 +69,23 @@ async function popLastTask() {
   return task;
 }
 
+/**
+ * 若当前有任务则原子取出并清空；否则返回 null。
+ * 用于长轮询，避免 peek + pop 之间的竞态。
+ */
+async function tryPopLastTask() {
+  let task = null;
+  await updateState((state) => {
+    task = state.lastTask ?? null;
+    if (!task) return state;
+    return {
+      ...state,
+      lastTask: null,
+    };
+  });
+  return task;
+}
+
 async function setBrowserTestSteps(steps) {
   await updateState((state) => ({
     ...state,
@@ -91,6 +108,7 @@ async function popBrowserTestSteps() {
 module.exports = {
   setLastTask,
   popLastTask,
+  tryPopLastTask,
   setBrowserTestSteps,
   popBrowserTestSteps,
   readState,

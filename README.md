@@ -67,7 +67,7 @@ claude mcp add --scope project --transport stdio devtools -- node /绝对路径/
 
 ### 5. 开始使用
 1. 终端运行：claude
-2. 对 Claude 说：持续调用 getDevToolsTask，有指令自动修改代码
+2. 对 Claude 说：循环调用 `waitForDevToolsTask`（例如 `timeoutMs=30000`），有任务就处理；或单次调用 `getDevToolsTask` 拉取队列
 3. 页面右键元素 → 发送到 Claude CLI
 4. 或让 AI 读取 Playwright 用例并下发到浏览器执行
 

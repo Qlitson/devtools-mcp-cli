@@ -3,7 +3,11 @@ const {
   StdioServerTransport,
 } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const z = require("zod");
-const { popLastTask } = require("./state");
+const { popLastTask, tryPopLastTask } = require("./state");
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const mcpServer = new McpServer({
   name: "DevToolsMCP",
@@ -30,6 +34,77 @@ mcpServer.registerTool(
       ],
       structuredContent: {
         task,
+      },
+    };
+  },
+);
+
+mcpServer.registerTool(
+  "waitForDevToolsTask",
+  {
+    description:
+      "Block until a DevTools task arrives or timeout. Long-poll style; consumes the task when found.",
+    inputSchema: z.object({
+      timeoutMs: z
+        .number()
+        .int()
+        .min(100)
+        .max(120_000)
+        .optional()
+        .describe("Max wait in ms (100–120000). Default 30000."),
+      pollIntervalMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(2000)
+        .optional()
+        .describe("Poll interval in ms (50–2000). Default 300."),
+    }),
+    outputSchema: z.object({
+      task: z.unknown().nullable(),
+      timedOut: z.boolean(),
+      waitedMs: z.number(),
+    }),
+  },
+  async ({ timeoutMs = 30_000, pollIntervalMs = 300 }) => {
+    const deadline = Date.now() + timeoutMs;
+    let waitedMs = 0;
+
+    while (Date.now() < deadline) {
+      const task = await tryPopLastTask();
+      if (task != null) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(task, null, 2),
+            },
+          ],
+          structuredContent: {
+            task,
+            timedOut: false,
+            waitedMs,
+          },
+        };
+      }
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      const step = Math.min(pollIntervalMs, remaining);
+      await sleep(step);
+      waitedMs += step;
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ task: null, timedOut: true, waitedMs }, null, 2),
+        },
+      ],
+      structuredContent: {
+        task: null,
+        timedOut: true,
+        waitedMs,
       },
     };
   },

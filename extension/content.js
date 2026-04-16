@@ -1,27 +1,4 @@
-let pressTimer;
-let targetEl;
-
 const DEVTOOLS_HTTP_BASE = "http://127.0.0.1:55666";
-
-document.addEventListener("mousedown", startPress);
-document.addEventListener("touchstart", startPress);
-document.addEventListener("mouseup", clearPress);
-document.addEventListener("touchend", clearPress);
-document.addEventListener("mouseleave", clearPress);
-document.addEventListener("touchmove", clearPress);
-
-function startPress(e) {
-  clearPress();
-  targetEl = e.target;
-  pressTimer = setTimeout(() => {
-    window.__devtoolsMcpLastTarget = targetEl;
-    chrome.runtime.sendMessage({ type: "longPress" });
-  }, 600);
-}
-
-function clearPress() {
-  clearTimeout(pressTimer);
-}
 
 document.addEventListener("contextmenu", (e) => {
   window.__devtoolsMcpLastTarget = e.target;
@@ -105,9 +82,36 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // 轮询执行 AI 下发的测试步骤
+const POLL_INTERVAL_ACTIVE_MS = 3000;
+const POLL_INTERVAL_HIDDEN_MS = 15000;
+const POLL_BACKOFF_MAX_MS = 60000;
+let pollTimer = null;
+let isPolling = false;
+let failureCount = 0;
+
+function getBaseInterval() {
+  if (!navigator.onLine) return POLL_INTERVAL_HIDDEN_MS;
+  return document.hidden ? POLL_INTERVAL_HIDDEN_MS : POLL_INTERVAL_ACTIVE_MS;
+}
+
+function getNextPollDelay() {
+  const base = getBaseInterval();
+  if (failureCount === 0) return base;
+  const backoff = base * Math.pow(2, failureCount);
+  return Math.min(backoff, POLL_BACKOFF_MAX_MS);
+}
+
+function scheduleNextPoll(delay = getNextPollDelay()) {
+  if (pollTimer) clearTimeout(pollTimer);
+  pollTimer = setTimeout(runPollLoop, delay);
+}
+
 async function pollAndRunTestSteps() {
   try {
     const res = await fetch(`${DEVTOOLS_HTTP_BASE}/get-browser-test-steps`);
+    if (!res.ok) {
+      throw new Error(`poll_failed_${res.status}`);
+    }
     const steps = await res.json();
     if (!steps || steps.length === 0) return;
 
@@ -158,7 +162,41 @@ async function pollAndRunTestSteps() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ results })
     });
-  } catch (err) {}
+  } catch (err) {
+    throw err;
+  }
 }
 
-setInterval(pollAndRunTestSteps, 1500);
+async function runPollLoop() {
+  if (isPolling) return;
+  if (!navigator.onLine) {
+    scheduleNextPoll(POLL_INTERVAL_HIDDEN_MS);
+    return;
+  }
+
+  isPolling = true;
+  try {
+    await pollAndRunTestSteps();
+    failureCount = 0;
+  } catch (err) {
+    failureCount += 1;
+  } finally {
+    isPolling = false;
+    scheduleNextPoll();
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  scheduleNextPoll(getNextPollDelay());
+});
+
+window.addEventListener("online", () => {
+  failureCount = 0;
+  scheduleNextPoll(300);
+});
+
+window.addEventListener("offline", () => {
+  scheduleNextPoll(POLL_INTERVAL_HIDDEN_MS);
+});
+
+runPollLoop();

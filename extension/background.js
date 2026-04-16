@@ -12,10 +12,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   await sendTask(tab.id);
 });
 
-chrome.runtime.onMessage.addListener(async (msg, sender) => {
-  if (msg.type === "longPress" && sender?.tab?.id) await sendTask(sender.tab.id);
-});
-
 const DEVTOOLS_HTTP_BASE = "http://127.0.0.1:55666";
 
 async function sendTask(tabId) {
@@ -25,7 +21,7 @@ async function sendTask(tabId) {
 
   const html = target?.html || "";
   if (!html) {
-    await alertInPage(tabId, "请先右键元素，或长按元素后再发送");
+    await alertInPage(tabId, "请先右键目标元素后再发送");
     return;
   }
 

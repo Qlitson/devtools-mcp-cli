@@ -11,7 +11,7 @@ DevTools ↔ 本地服务 ↔ Claude CLI 双向打通
 支持 Playwright 风格操作在真实浏览器中回放
 
 ## ✨ 功能特性
-- 右键 / 长按页面元素，一键发送需求给 Claude CLI
+- 右键页面元素，一键发送需求给 Claude CLI
 - 自动监听页面报错，上传给 AI 自动分析修复
 - AI 可将 Playwright E2E 用例转为操作步骤，浏览器直接执行
 - 支持 click / fill / check / navigate 等标准操作

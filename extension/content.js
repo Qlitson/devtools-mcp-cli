@@ -105,23 +105,33 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // 轮询执行 AI 下发的测试步骤
-const POLL_INTERVAL_ACTIVE_MS = 3000;
-const POLL_INTERVAL_HIDDEN_MS = 15000;
-const POLL_BACKOFF_MAX_MS = 60000;
+const POLL_INTERVAL_ACTIVE_MS = 8000;
+const POLL_INTERVAL_HIDDEN_MS = 30000;
+const POLL_BACKOFF_MAX_MS = 120000;
+const POLL_IDLE_SLOW_AFTER = 8;
+const POLL_IDLE_SLOW_FACTOR = 3;
+const POLL_IDLE_MAX_MS = 120000;
 let pollTimer = null;
 let isPolling = false;
 let failureCount = 0;
+let emptyPollStreak = 0;
 
 function getBaseInterval() {
   if (!navigator.onLine) return POLL_INTERVAL_HIDDEN_MS;
   return document.hidden ? POLL_INTERVAL_HIDDEN_MS : POLL_INTERVAL_ACTIVE_MS;
 }
 
-function getNextPollDelay() {
+function getNextPollDelay({ hadSteps } = { hadSteps: false }) {
   const base = getBaseInterval();
-  if (failureCount === 0) return base;
-  const backoff = base * Math.pow(2, failureCount);
-  return Math.min(backoff, POLL_BACKOFF_MAX_MS);
+  if (failureCount > 0) {
+    const backoff = base * Math.pow(2, failureCount);
+    return Math.min(backoff, POLL_BACKOFF_MAX_MS);
+  }
+  if (!hadSteps && emptyPollStreak >= POLL_IDLE_SLOW_AFTER) {
+    const slowed = base * POLL_IDLE_SLOW_FACTOR;
+    return Math.min(slowed, POLL_IDLE_MAX_MS);
+  }
+  return base;
 }
 
 function scheduleNextPoll(delay = getNextPollDelay()) {
@@ -136,7 +146,7 @@ async function pollAndRunTestSteps() {
       throw new Error(`poll_failed_${res.status}`);
     }
     const steps = await res.json();
-    if (!steps || steps.length === 0) return;
+    if (!steps || steps.length === 0) return false;
 
     const results = [];
     for (const step of steps) {
@@ -185,6 +195,7 @@ async function pollAndRunTestSteps() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ results })
     });
+    return true;
   } catch (err) {
     throw err;
   }
@@ -199,13 +210,20 @@ async function runPollLoop() {
 
   isPolling = true;
   try {
-    await pollAndRunTestSteps();
+    const hadSteps = await pollAndRunTestSteps();
     failureCount = 0;
+    if (hadSteps) {
+      emptyPollStreak = 0;
+    } else {
+      emptyPollStreak += 1;
+    }
+    scheduleNextPoll(getNextPollDelay({ hadSteps }));
   } catch (err) {
     failureCount += 1;
+    emptyPollStreak += 1;
+    scheduleNextPoll(getNextPollDelay({ hadSteps: false }));
   } finally {
     isPolling = false;
-    scheduleNextPoll();
   }
 }
 

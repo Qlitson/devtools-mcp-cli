@@ -1,35 +1,29 @@
 const DEVTOOLS_HTTP_BASE = "http://127.0.0.1:55666";
 const STORAGE_POLL_ENABLED_KEY = "devtoolsPollStepsEnabled";
-let lastContextTarget = null;
-let lastPointerTarget = null;
-let lastPointer = null;
-
-document.addEventListener("mousedown", (e) => {
-  lastPointerTarget = e.target;
-  lastPointer = { x: e.clientX, y: e.clientY };
-});
-
-document.addEventListener("contextmenu", (e) => {
-  lastContextTarget = e.target;
-  lastPointer = { x: e.clientX, y: e.clientY };
-});
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg?.type === "devtools:getTarget") {
-    const el = resolveCapturedElement();
-    sendResponse({
-      html: el?.outerHTML || "",
-      url: location.href,
-      selector: el ? buildSelector(el) : "",
-      reason: el ? "captured" : "none",
-    });
+  if (msg?.type === "devtools:consoleLog") {
+    const label = msg.label || "[DevTools MCP]";
+    if (msg.payload !== undefined) console.log(label, msg.payload);
+    else console.log(label);
+    sendResponse({ ok: true });
     return;
   }
 
   if (msg?.type === "devtools:showPromptModal") {
-    showPromptModalUI(msg.title || "输入内容")
-      .then((text) => sendResponse({ text }))
-      .catch(() => sendResponse({ text: "" }));
+    (async () => {
+      const title = msg.title || "输入内容";
+      const out = await showSendTaskModal(title);
+      if (!out.cancelled) {
+        try {
+          await savePollEnabled(out.pollEnabled);
+          await applyPollEnabled(out.pollEnabled);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      sendResponse({ text: out.cancelled ? "" : out.text });
+    })();
     return true;
   }
 
@@ -40,54 +34,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
-function resolveCapturedElement() {
-  if (lastContextTarget instanceof Element) return lastContextTarget;
-  if (lastPointerTarget instanceof Element) return lastPointerTarget;
-  if (lastPointer) {
-    const pointed = document.elementFromPoint(lastPointer.x, lastPointer.y);
-    if (pointed instanceof Element) return pointed;
-  }
-  if (document.activeElement instanceof Element && document.activeElement !== document.body) {
-    return document.activeElement;
-  }
-  return null;
-}
-
-function buildSelector(el) {
-  if (!(el instanceof Element)) return "";
-  if (el.id) return `#${cssEscape(el.id)}`;
-
-  const parts = [];
-  let node = el;
-  while (node && node.nodeType === 1 && parts.length < 6) {
-    let part = node.tagName.toLowerCase();
-    const className = (node.getAttribute("class") || "").trim();
-    if (className) {
-      const cls = className.split(/\s+/).filter(Boolean).slice(0, 2);
-      if (cls.length) part += "." + cls.map(cssEscape).join(".");
-    }
-    const parent = node.parentElement;
-    if (parent) {
-      const siblings = Array.from(parent.children).filter(
-        (c) => c.tagName === node.tagName,
-      );
-      if (siblings.length > 1) {
-        const idx = siblings.indexOf(node) + 1;
-        part += `:nth-of-type(${idx})`;
-      }
-    }
-    parts.unshift(part);
-    if (node.tagName.toLowerCase() === "html") break;
-    node = node.parentElement;
-  }
-  return parts.join(" > ");
-}
-
-function cssEscape(value) {
-  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
-    return CSS.escape(value);
-  }
-  return String(value).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+function logOutgoingToServer(label, body) {
+  const payload =
+    body && typeof body === "object"
+      ? {
+          ...body,
+          dom:
+            typeof body.dom === "string" && body.dom.length > 800
+              ? `${body.dom.slice(0, 800)}…（共 ${body.dom.length} 字符，已截断）`
+              : body.dom,
+        }
+      : body;
+  console.log("[DevTools MCP]", label, payload);
 }
 
 function mountDevToolsUiStyles() {
@@ -95,29 +53,148 @@ function mountDevToolsUiStyles() {
   const style = document.createElement("style");
   style.id = "devtools-mcp-ui-styles";
   style.textContent = `
-    .devtools-mcp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:16px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-    .devtools-mcp-modal{width:min(560px,100%);background:#fff;color:#111;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.35);overflow:hidden}
-    .devtools-mcp-modal header{padding:14px 16px;border-bottom:1px solid #eee;font-weight:600;font-size:14px}
-    .devtools-mcp-modal main{padding:14px 16px}
-    .devtools-mcp-modal footer{padding:12px 16px;border-top:1px solid #eee;display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
-    .devtools-mcp-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 12px}
-    .devtools-mcp-row label{font-size:13px;color:#333}
-    .devtools-mcp-switch{position:relative;width:44px;height:24px;flex:0 0 auto}
-    .devtools-mcp-switch input{opacity:0;width:0;height:0}
-    .devtools-mcp-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#cfd6df;transition:.2s;border-radius:999px}
-    .devtools-mcp-slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;top:3px;background:#fff;transition:.2s;border-radius:50%;box-shadow:0 1px 2px rgba(0,0,0,.2)}
-    .devtools-mcp-switch input:checked + .devtools-mcp-slider{background:#2b6cff}
-    .devtools-mcp-switch input:checked + .devtools-mcp-slider:before{transform:translateX(20px)}
-    .devtools-mcp-hint{font-size:12px;color:#666;line-height:1.4}
-    .devtools-mcp-textarea{width:100%;min-height:120px;resize:vertical;padding:10px 12px;border:1px solid #d7d7d7;border-radius:10px;font-size:13px;line-height:1.45;outline:none}
-    .devtools-mcp-textarea:focus{border-color:#2b6cff;box-shadow:0 0 0 3px rgba(43,108,255,.15)}
-    .devtools-mcp-btn{border:0;border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer}
-    .devtools-mcp-btn.secondary{background:#f2f4f7;color:#111}
-    .devtools-mcp-btn.primary{background:#2b6cff;color:#fff}
     .devtools-mcp-toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483646;background:#111;color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;max-width:min(560px,calc(100% - 32px));box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;transition:opacity .18s ease}
     .devtools-mcp-toast.show{opacity:1}
+    .devtools-mcp-modal{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45);backdrop-filter:saturate(1.2) blur(2px);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    .devtools-mcp-modal-panel{width:min(440px,calc(100vw - 40px));max-height:min(520px,calc(100vh - 40px));overflow:auto;background:#1a1a1a;color:#eee;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}
+    .devtools-mcp-modal-panel h2{margin:0 0 14px;font-size:16px;font-weight:600;line-height:1.35}
+    .devtools-mcp-modal-body{padding:18px 18px 0}
+    .devtools-mcp-modal-body label{display:block;font-size:12px;color:#9ca3af;margin-bottom:6px}
+    .devtools-mcp-modal-body textarea{width:100%;min-height:100px;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:#111;color:#eee;font-size:14px;line-height:1.45;resize:vertical}
+    .devtools-mcp-modal-body textarea:focus{outline:none;border-color:rgba(99,102,241,.65);box-shadow:0 0 0 2px rgba(99,102,241,.2)}
+    .devtools-mcp-toggle-row{display:flex;align-items:flex-start;gap:10px;margin-top:16px;padding:12px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
+    .devtools-mcp-toggle-row input{flex-shrink:0;width:18px;height:18px;margin-top:2px;accent-color:#6366f1;cursor:pointer}
+    .devtools-mcp-toggle-row span{font-size:13px;line-height:1.45;color:#d1d5db}
+    .devtools-mcp-toggle-row strong{color:#f3f4f6;display:block;margin-bottom:2px;font-size:13px}
+    .devtools-mcp-modal-actions{display:flex;justify-content:flex-end;gap:10px;padding:16px 18px 18px}
+    .devtools-mcp-modal-actions button{font-size:14px;padding:8px 16px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+    .devtools-mcp-btn-secondary{background:transparent;color:#d1d5db;border-color:rgba(255,255,255,.15)}
+    .devtools-mcp-btn-secondary:hover{background:rgba(255,255,255,.06)}
+    .devtools-mcp-btn-primary{background:#6366f1;color:#fff;border-color:#6366f1}
+    .devtools-mcp-btn-primary:hover{filter:brightness(1.06)}
   `;
   document.documentElement.appendChild(style);
+}
+
+/**
+ * @param {string} title
+ * @returns {Promise<{ text: string, pollEnabled: boolean, cancelled: boolean }>}
+ */
+function showSendTaskModal(title) {
+  return loadPollEnabled().then((initialPoll) => {
+    return new Promise((resolve) => {
+    mountDevToolsUiStyles();
+    document.getElementById("devtools-mcp-modal-root")?.remove();
+
+    const root = document.createElement("div");
+    root.id = "devtools-mcp-modal-root";
+    root.className = "devtools-mcp-modal";
+    root.setAttribute("role", "presentation");
+
+    const panel = document.createElement("div");
+    panel.className = "devtools-mcp-modal-panel";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-modal", "true");
+
+    const h2 = document.createElement("h2");
+    h2.textContent = title;
+
+    const body = document.createElement("div");
+    body.className = "devtools-mcp-modal-body";
+
+    const labPrompt = document.createElement("label");
+    labPrompt.htmlFor = "devtools-mcp-prompt-input";
+    labPrompt.textContent = "修改指令";
+
+    const ta = document.createElement("textarea");
+    ta.id = "devtools-mcp-prompt-input";
+    ta.rows = 4;
+    ta.placeholder = "描述你希望 AI 如何修改当前选中的 DOM…";
+
+    const toggleRow = document.createElement("div");
+    toggleRow.className = "devtools-mcp-toggle-row";
+
+    const pollCb = document.createElement("input");
+    pollCb.type = "checkbox";
+    pollCb.checked = initialPoll === true;
+    pollCb.id = "devtools-mcp-poll-toggle";
+
+    const toggleText = document.createElement("span");
+    const strong = document.createElement("strong");
+    strong.textContent = "Claude → 浏览器";
+    toggleText.appendChild(strong);
+    toggleText.appendChild(
+      document.createTextNode(
+        " 开启后扩展会轮询本地服务并自动执行 AI 下发的页面操作步骤（测试/回放）。",
+      ),
+    );
+
+    toggleRow.appendChild(pollCb);
+    toggleRow.appendChild(toggleText);
+
+    body.appendChild(labPrompt);
+    body.appendChild(ta);
+    body.appendChild(toggleRow);
+
+    const actions = document.createElement("div");
+    actions.className = "devtools-mcp-modal-actions";
+
+    const btnCancel = document.createElement("button");
+    btnCancel.type = "button";
+    btnCancel.className = "devtools-mcp-btn-secondary";
+    btnCancel.textContent = "取消";
+
+    const btnOk = document.createElement("button");
+    btnOk.type = "button";
+    btnOk.className = "devtools-mcp-btn-primary";
+    btnOk.textContent = "确定";
+
+    actions.appendChild(btnCancel);
+    actions.appendChild(btnOk);
+
+    panel.appendChild(h2);
+    panel.appendChild(body);
+    panel.appendChild(actions);
+    root.appendChild(panel);
+    document.documentElement.appendChild(root);
+
+    function cleanup() {
+      root.remove();
+      document.removeEventListener("keydown", onKey, true);
+    }
+
+    function finish(cancelled) {
+      cleanup();
+      resolve({
+        text: cancelled ? "" : ta.value.trim(),
+        pollEnabled: !!pollCb.checked,
+        cancelled,
+      });
+    }
+
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        finish(true);
+      }
+    }
+
+    document.addEventListener("keydown", onKey, true);
+
+    root.addEventListener("click", (e) => {
+      if (e.target === root) finish(true);
+    });
+    panel.addEventListener("click", (e) => e.stopPropagation());
+
+    btnCancel.addEventListener("click", () => finish(true));
+    btnOk.addEventListener("click", () => finish(false));
+
+    requestAnimationFrame(() => {
+      ta.focus();
+    });
+    });
+  });
 }
 
 async function loadPollEnabled() {
@@ -143,136 +220,37 @@ function showToast(message) {
   }, 2200);
 }
 
-function showPromptModalUI(title) {
-  mountDevToolsUiStyles();
-
-  return new Promise((resolve) => {
-    const overlay = document.createElement("div");
-    overlay.className = "devtools-mcp-overlay";
-
-    const modal = document.createElement("div");
-    modal.className = "devtools-mcp-modal";
-
-    const header = document.createElement("header");
-    header.textContent = title;
-
-    const main = document.createElement("main");
-    const textarea = document.createElement("textarea");
-    textarea.className = "devtools-mcp-textarea";
-    textarea.placeholder = "例如：把这个按钮改成禁用态，并补充埋点…";
-
-    const row = document.createElement("div");
-    row.className = "devtools-mcp-row";
-
-    const label = document.createElement("label");
-    label.textContent = "是否开启 Claude 到浏览器方向的通信";
-
-    const swWrap = document.createElement("label");
-    swWrap.className = "devtools-mcp-switch";
-    const swInput = document.createElement("input");
-    swInput.type = "checkbox";
-    const swSlider = document.createElement("span");
-    swSlider.className = "devtools-mcp-slider";
-    swWrap.appendChild(swInput);
-    swWrap.appendChild(swSlider);
-
-    row.appendChild(label);
-    row.appendChild(swWrap);
-
-    const hint = document.createElement("div");
-    hint.className = "devtools-mcp-hint";
-    hint.textContent =
-      "关闭时不会向本地服务拉取待执行步骤，Claude 无法通过本路径驱动当前页。需要 AI 下发点击、填写等操作到浏览器时再打开；默认关闭以减少后台请求。";
-
-    main.appendChild(textarea);
-    main.appendChild(row);
-    main.appendChild(hint);
-
-    const footer = document.createElement("footer");
-    const cancel = document.createElement("button");
-    cancel.className = "devtools-mcp-btn secondary";
-    cancel.type = "button";
-    cancel.textContent = "取消";
-
-    const ok = document.createElement("button");
-    ok.className = "devtools-mcp-btn primary";
-    ok.type = "button";
-    ok.textContent = "发送";
-
-    footer.appendChild(cancel);
-    footer.appendChild(ok);
-
-    modal.appendChild(header);
-    modal.appendChild(main);
-    modal.appendChild(footer);
-    overlay.appendChild(modal);
-    document.documentElement.appendChild(overlay);
-
-    const close = (value) => {
-      overlay.remove();
-      resolve(value);
-    };
-
-    const onKey = (e) => {
-      if (e.key === "Escape") close("");
-    };
-
-    loadPollEnabled().then((enabled) => {
-      swInput.checked = !!enabled;
-    });
-
-    swInput.addEventListener("change", async () => {
-      await savePollEnabled(swInput.checked);
-      await applyPollEnabled(swInput.checked);
-    });
-
-    cancel.addEventListener("click", () => close(""));
-    ok.addEventListener("click", () => close(textarea.value.trim()));
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) close("");
-    });
-
-    window.addEventListener("keydown", onKey);
-
-    setTimeout(() => textarea.focus(), 0);
-
-    overlay.addEventListener(
-      "remove",
-      () => {
-        window.removeEventListener("keydown", onKey);
-      },
-      { once: true },
-    );
-  });
-}
-
 // 监听页面错误
 window.addEventListener('error', (e) => {
+  const body = {
+    type: 'page_error',
+    message: e.message,
+    filename: e.filename,
+    line: e.lineno,
+    col: e.colno,
+    stack: e.error?.stack,
+    url: location.href
+  };
+  logOutgoingToServer('上报 page_error → /from-devtools', body);
   fetch(`${DEVTOOLS_HTTP_BASE}/from-devtools`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: 'page_error',
-      message: e.message,
-      filename: e.filename,
-      line: e.lineno,
-      col: e.colno,
-      stack: e.error?.stack,
-      url: location.href
-    })
+    body: JSON.stringify(body)
   }).catch(() => {});
 });
 
 window.addEventListener('unhandledrejection', (e) => {
+  const body = {
+    type: 'unhandled_rejection',
+    message: String(e.reason?.message || e.reason || 'unknown'),
+    stack: e.reason?.stack,
+    url: location.href
+  };
+  logOutgoingToServer('上报 unhandledrejection → /from-devtools', body);
   fetch(`${DEVTOOLS_HTTP_BASE}/from-devtools`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: 'unhandled_rejection',
-      message: String(e.reason?.message || e.reason || 'unknown'),
-      stack: e.reason?.stack,
-      url: location.href
-    })
+    body: JSON.stringify(body)
   }).catch(() => {});
 });
 

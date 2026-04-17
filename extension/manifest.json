@@ -2,12 +2,14 @@
   "manifest_version": 3,
   "name": "DevTools To Claude CLI",
   "version": "1.0",
-  "permissions": ["contextMenus","activeTab","scripting","storage"],
+  "permissions": ["contextMenus","activeTab","storage"],
   "host_permissions": ["http://127.0.0.1:55666/*", "http://localhost:55666/*"],
+  "devtools_page": "devtools.html",
   "background": { "service_worker": "background.js" },
   "content_scripts": [{
     "matches": ["<all_urls>"],
     "js": ["content.js"],
-    "run_at": "document_start"
+    "run_at": "document_start",
+    "all_frames": true
   }]
 }

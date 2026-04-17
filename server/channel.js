@@ -13,7 +13,12 @@ const { Server } = require("@modelcontextprotocol/sdk/server/index.js");
 const {
   StdioServerTransport,
 } = require("@modelcontextprotocol/sdk/server/stdio.js");
-const { setLastTask, setBrowserTestSteps, popBrowserTestSteps } = require("./state");
+const {
+  setLastTask,
+  appendDiagnostic,
+  setBrowserTestSteps,
+  popBrowserTestSteps,
+} = require("./state");
 
 const HTTP_HOST = process.env.DEVTOOLS_CHANNEL_HTTP_HOST || "127.0.0.1";
 const HTTP_PORT = Number.parseInt(
@@ -94,18 +99,26 @@ async function pushChannelEvent(content, meta) {
 }
 
 app.post("/from-devtools", async (req, res) => {
-  await setLastTask(req.body);
-
   const type = req.body?.type || "user_prompt";
-  const selector = req.body?.selector || "";
-  const prompt = req.body?.prompt ? String(req.body.prompt).slice(0, 120) : "";
-  const url = req.body?.url || "";
-  console.log("✅ 收到 DevTools 指令:", {
-    type,
-    selector,
-    url,
-    promptPreview: prompt,
-  });
+  if (type === "page_error" || type === "unhandled_rejection") {
+    await appendDiagnostic(req.body);
+    console.log("⚠️ 收到页面诊断（已写入 diagnostics，未覆盖 lastTask）:", {
+      type,
+      url: req.body?.url || "",
+      message: String(req.body?.message || "").slice(0, 200),
+    });
+  } else {
+    await setLastTask(req.body);
+    const selector = req.body?.selector || "";
+    const prompt = req.body?.prompt ? String(req.body.prompt).slice(0, 120) : "";
+    const url = req.body?.url || "";
+    console.log("✅ 收到 DevTools 指令:", {
+      type,
+      selector,
+      url,
+      promptPreview: prompt,
+    });
+  }
 
   const payload = JSON.stringify(req.body);
   await pushChannelEvent(payload, {

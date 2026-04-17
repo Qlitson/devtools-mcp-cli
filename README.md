@@ -13,7 +13,7 @@ DevTools ↔ 本地服务 ↔ Claude CLI 双向打通
 支持 Playwright 风格操作在真实浏览器中回放
 
 ## ✨ 功能特性
-- 右键页面元素，一键发送需求给 Claude CLI
+- 在 Chrome DevTools 的 Elements 中选中节点（`$0`），再通过右键菜单唤起输入框，一键发送需求给 Claude CLI
 - 自动监听页面报错，上传给 AI 自动分析修复
 - AI 可将 Playwright E2E 用例转为操作步骤，浏览器直接执行
 - 支持 click / fill / check / navigate 等标准操作
@@ -76,22 +76,36 @@ claude --dangerously-load-development-channels server:devtools-channel server:de
 `http://127.0.0.1:55666/channel-health`
 
 #### 模式 B：HTTP Bridge + MCP 拉取（兼容性最好）
-1. 启动 HTTP bridge（默认 `127.0.0.1:55667`）：
+
+非 Channels 时，浏览器只和 **HTTP bridge** 说话；Claude 通过 **MCP 子进程**（`server/mcp.js`）读写同一份 `server/.runtime/state.json` 里的队列。需要 **两个东西同时就绪**：本机 HTTP + 已连接 MCP 的 Claude 会话。
+
+1. **先起 HTTP bridge**（扩展 `POST /from-devtools` 写到这里，默认 `127.0.0.1:55667`）：
 
 ```bash
 cd server
 npm run start:http
 ```
 
-2. 启动 Claude（普通启动即可，不需要 `--channels`）：
+2. **再「激活」Claude Code（加载本仓库的 MCP）**  
+   - 在**已配置好**上一节「2. 配置 Claude Code MCP」里那条 `claude mcp add ... server/mcp.js` 的项目目录打开终端（或确保 **project** 作用域的 MCP 指向本仓库的 `mcp.js`）。  
+   - 普通启动即可，**不要**加 `--dangerously-load-development-channels`（模式 B 与 Channels 无关）：
 
 ```bash
 claude
 ```
 
-3. 让 Claude **循环调用** `waitForDevToolsTask`（或单次 `getDevToolsTask`）来消费队列。
+   - 进入会话后，确认工具列表里能看到 **`getDevToolsTask`** / **`waitForDevToolsTask`**（说明 `mcp.js` 已由 Claude Code 拉起并连上）。若看不到，检查当前目录是否是该 MCP 所在项目、或 `claude mcp list` 是否包含 `devtools`。
+
+3. **让 Claude 真正开始消费队列**（否则扩展写入的任务会一直积在 `state.json`）：在对话里明确要求它**反复或阻塞式**调用 MCP，例如：
+
+   - 单次查看：`请调用 getDevToolsTask，若有任务则根据其中的 dom / prompt 处理。`  
+   - 持续拉取（更贴近「激活监听」）：`请在一个循环里多次调用 waitForDevToolsTask（例如 timeout 30s、间隔 300ms），直到取到来自浏览器的任务再回复我；之后若我继续在网页里发送，请继续用同样方式拉取。`
+
+   也可把上述约定写进项目根 **`CLAUDE.md`** 或 **Cursor/Claude 项目规则**，这样每次开会话不必手动重复说明。
 
 4. **同步扩展端口**：本仓库扩展默认连接 `55666`（为模式 A 预留）。走模式 B 时，请把扩展里的 `55666` 改为 `55667`（或自行统一端口并同时改 `server/http.js` / 扩展 / manifest）。
+
+说明：一般**不需要**再单独终端跑 `npm run start:mcp`——Claude Code 启动会话时会自动 spawn `mcp.js`。仅在你想脱离 Claude、单独调试 MCP 时才手动跑 `start:mcp`。
 
 ### 4. 安装 Chrome 扩展
 1. 打开 chrome://extensions/
@@ -100,7 +114,7 @@ claude
 
 ### 5. 开始使用
 - **模式 A**：保持按 `--dangerously-load-development-channels ...` 启动的会话打开；网页右键发送到 Claude。
-- **模式 B**：保持 `npm run start:http` 运行；Claude 侧用 `waitForDevToolsTask`/`getDevToolsTask` 消费任务；网页右键发送到本地队列。
+- **模式 B**：保持 `npm run start:http` 运行；在本仓库目录用 `claude` 激活会话并确认已加载 `devtools` MCP；按上节说明让模型调用 `waitForDevToolsTask`/`getDevToolsTask` 消费队列；网页右键发送到本地队列。
 
 （可选）让 AI 读取 Playwright 用例并下发到浏览器执行。
 
@@ -108,7 +122,7 @@ claude
 让 Claude 读取你的 .spec.js 测试用例，提取操作步骤后调用：
 /set-browser-test-steps
 
-浏览器插件可按需执行 AI 下发的页面操作（**Claude → 浏览器方向默认关闭**；在右键发送时弹出的浮层里开启「是否开启 Claude 到浏览器方向的通信」后，扩展才会向本地服务拉取并执行步骤）：
+浏览器插件可按需执行 AI 下发的页面操作（**Claude → 浏览器方向默认关闭**；右键发送时在页面内弹窗中填写指令，并在同一弹窗内切换「Claude → 浏览器」开关；开启后扩展才会向本地服务拉取并执行步骤）：
 - click
 - fill
 - check

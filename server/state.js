@@ -7,6 +7,7 @@ const STATE_FILE = path.join(RUNTIME_DIR, "state.json");
 const EMPTY_STATE = {
   lastTask: null,
   browserTestSteps: [],
+  diagnostics: [],
 };
 let stateWriteChain = Promise.resolve();
 
@@ -55,6 +56,19 @@ async function setLastTask(task) {
     ...state,
     lastTask: task,
   }));
+}
+
+/** 页面自动上报的错误/拒绝，不得覆盖 lastTask（否则会在用户点「发送」前后冲掉刚提交的 DOM） */
+async function appendDiagnostic(entry) {
+  const item = { ...entry, receivedAt: Date.now() };
+  await updateState((state) => {
+    const prev = Array.isArray(state.diagnostics) ? state.diagnostics : [];
+    const next = [...prev, item].slice(-50);
+    return {
+      ...state,
+      diagnostics: next,
+    };
+  });
 }
 
 async function popLastTask() {
@@ -107,6 +121,7 @@ async function popBrowserTestSteps() {
 
 module.exports = {
   setLastTask,
+  appendDiagnostic,
   popLastTask,
   tryPopLastTask,
   setBrowserTestSteps,

@@ -21,14 +21,14 @@ async function sendTask(tabId, clickInfo = {}) {
 
   const html = target?.html || "";
   if (!html) {
-    await alertInPage(
+    await toastInPage(
       tabId,
       "未捕获到目标元素。请在页面内容区域右键元素后，再点“发送到 Claude CLI”。",
     );
     return;
   }
 
-  const promptText = await promptInPage(tabId, "输入你的修改指令：");
+  const promptText = await showPromptModal(tabId, "输入你的修改指令：");
   if (!promptText) return;
 
   try {
@@ -43,27 +43,23 @@ async function sendTask(tabId, clickInfo = {}) {
         clickInfo,
       }),
     });
-    await alertInPage(tabId, "已发送到本地服务");
+    await toastInPage(tabId, "已发送到本地服务");
   } catch (e) {
-    await alertInPage(tabId, "请先启动本地 server");
+    await toastInPage(tabId, "请先启动本地 server");
   }
 }
 
-async function promptInPage(tabId, message) {
-  const [result] = await chrome.scripting.executeScript({
-    target: { tabId },
-    func: (msg) => window.prompt(msg) || "",
-    args: [message],
-  });
-  return result?.result || "";
+async function showPromptModal(tabId, title) {
+  const response = await chrome.tabs
+    .sendMessage(tabId, { type: "devtools:showPromptModal", title })
+    .catch(() => null);
+  return response?.text || "";
 }
 
-async function alertInPage(tabId, message) {
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    func: (msg) => window.alert(msg),
-    args: [message],
-  });
+async function toastInPage(tabId, message) {
+  await chrome.tabs
+    .sendMessage(tabId, { type: "devtools:toast", message })
+    .catch(() => null);
 }
 
 async function getTargetByInjectedScript(tabId) {

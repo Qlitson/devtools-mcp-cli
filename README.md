@@ -108,7 +108,7 @@ claude
 让 Claude 读取你的 .spec.js 测试用例，提取操作步骤后调用：
 /set-browser-test-steps
 
-浏览器插件会自动轮询并执行：
+浏览器插件可按需执行 AI 下发的页面操作（**Claude → 浏览器方向默认关闭**；在右键发送时弹出的浮层里开启「是否开启 Claude 到浏览器方向的通信」后，扩展才会向本地服务拉取并执行步骤）：
 - click
 - fill
 - check

@@ -8,9 +8,14 @@
 const PORT_NAME = "devtools-mcp-bridge";
 const SNAPSHOT_MAX_AGE_MS = 120_000;
 
-/** @type {{ ok: boolean, html: string, url: string, ts: number } | null} */
+/** @type {{ ok: boolean, html: string, url: string, ts: number, sourceHints?: unknown[] } | null} */
 let lastSelectionSnapshot = null;
 
+/**
+ * 在页面主世界执行：除 outerHTML 外尽量收集「源码位置」线索。
+ * 说明：Source Map 只映射「打包 JS 行列 → 源码行列」，无法从任意 DOM 反查文件；
+ * 开发模式下 React / Vue2 / Vue3 会在内部结构里挂源码路径（不等同于解析 .map 文件）。
+ */
 function buildDollar0EvalExpression() {
   return `(function () {
   try {
@@ -18,12 +23,98 @@ function buildDollar0EvalExpression() {
     if (!el || el.nodeType !== 1) {
       return { ok: false, reason: "no_$0" };
     }
+    var sourceHints = [];
+    (function collectReactDebugSource(dom) {
+      var keys = Object.keys(dom);
+      var i, k, fiber, depth, src, tname;
+      for (i = 0; i < keys.length; i++) {
+        k = keys[i];
+        if (k.indexOf("__reactFiber$") === 0 || k.indexOf("__reactInternalInstance$") === 0) {
+          fiber = dom[k];
+          depth = 0;
+          while (fiber && depth < 48) {
+            src = fiber._debugSource;
+            if (src && src.fileName) {
+              tname = "";
+              try {
+                if (fiber.type) {
+                  if (typeof fiber.type === "function" && fiber.type.name) {
+                    tname = String(fiber.type.name);
+                  } else if (typeof fiber.type === "string") {
+                    tname = fiber.type;
+                  }
+                }
+              } catch (ignored) {}
+              sourceHints.push({
+                kind: "react_debugSource",
+                componentName: tname,
+                fileName: String(src.fileName),
+                lineNumber: Number(src.lineNumber) || 0,
+                columnNumber: Number(src.columnNumber) || 0,
+              });
+              return;
+            }
+            fiber = fiber.return;
+            depth++;
+          }
+          return;
+        }
+      }
+    })(el);
+    (function collectVue3SfcFile(dom) {
+      try {
+        var vm = dom.__vueParentComponent;
+        if (!vm) return;
+        var def = vm.type;
+        var file = def && def.__file;
+        if (file) {
+          sourceHints.push({
+            kind: "vue_sfc",
+            fileName: String(file),
+            componentName: def.name ? String(def.name) : "",
+          });
+        }
+      } catch (ignored) {}
+    })(el);
+    (function collectVue2SfcFile(dom) {
+      try {
+        var cur = dom;
+        var depth = 0;
+        while (cur && depth < 60) {
+          var vm = cur.__vue__;
+          if (vm) {
+            var walk = vm;
+            var w = 0;
+            while (walk && w < 40) {
+              var opt = walk.$options;
+              var file = opt && opt.__file;
+              if (file) {
+                var cname = "";
+                if (opt.name) cname = String(opt.name);
+                else if (opt._componentTag) cname = String(opt._componentTag);
+                sourceHints.push({
+                  kind: "vue2_sfc",
+                  fileName: String(file),
+                  componentName: cname,
+                });
+                return;
+              }
+              walk = walk.$parent;
+              w++;
+            }
+          }
+          cur = cur.parentElement;
+          depth++;
+        }
+      } catch (ignored) {}
+    })(el);
     return {
       ok: true,
       html: el.outerHTML,
       url: String(location.href || ""),
       selector: "",
       source: "devtools_$0",
+      sourceHints: sourceHints,
     };
   } catch (e) {
     return { ok: false, reason: String(e && e.message ? e.message : e) };
@@ -42,6 +133,7 @@ function rememberSnapshotFromResult(result) {
     html: result.html,
     url: typeof result.url === "string" ? result.url : "",
     ts: Date.now(),
+    sourceHints: Array.isArray(result.sourceHints) ? result.sourceHints : [],
   };
 }
 
@@ -138,6 +230,7 @@ function tryFallbackSnapshot(requestId, liveReason) {
       url: snap.url || "",
       selector: "",
       source: "devtools_$0_snapshot",
+      sourceHints: Array.isArray(snap.sourceHints) ? snap.sourceHints : [],
     });
     return;
   }

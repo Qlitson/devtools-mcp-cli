@@ -73,6 +73,7 @@ async function getTargetFromElementsPanel(tabId) {
     url: typeof raw.url === "string" ? raw.url : "",
     selector: typeof raw.selector === "string" ? raw.selector : "",
     reason: raw.source || "devtools_$0",
+    sourceHints: Array.isArray(raw.sourceHints) ? raw.sourceHints : [],
   };
 }
 
@@ -111,6 +112,7 @@ async function sendTask(tabId, clickInfo = {}) {
     prompt: promptText,
     url: target?.url || "",
     selector: target?.selector || "",
+    sourceHints: target?.sourceHints || [],
     clickInfo,
   };
   const logPayload = { ...body, dom: truncateDomForLog(body.dom) };

@@ -57,7 +57,6 @@ function mountDevToolsUiStyles() {
     .devtools-mcp-toast.show{opacity:1}
     .devtools-mcp-modal{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45);backdrop-filter:saturate(1.2) blur(2px);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
     .devtools-mcp-modal-panel{width:min(440px,calc(100vw - 40px));max-height:min(520px,calc(100vh - 40px));overflow:auto;background:#1a1a1a;color:#eee;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}
-    .devtools-mcp-modal-panel h2{margin:0 0 14px;font-size:16px;font-weight:600;line-height:1.35}
     .devtools-mcp-modal-body{padding:18px 18px 0}
     .devtools-mcp-modal-body label{display:block;font-size:12px;color:#9ca3af;margin-bottom:6px}
     .devtools-mcp-modal-body textarea{width:100%;min-height:100px;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:#111;color:#eee;font-size:14px;line-height:1.45;resize:vertical}
@@ -83,123 +82,120 @@ function mountDevToolsUiStyles() {
 function showSendTaskModal(title) {
   return loadPollEnabled().then((initialPoll) => {
     return new Promise((resolve) => {
-    mountDevToolsUiStyles();
-    document.getElementById("devtools-mcp-modal-root")?.remove();
+      mountDevToolsUiStyles();
+      document.getElementById("devtools-mcp-modal-root")?.remove();
 
-    const root = document.createElement("div");
-    root.id = "devtools-mcp-modal-root";
-    root.className = "devtools-mcp-modal";
-    root.setAttribute("role", "presentation");
+      const root = document.createElement("div");
+      root.id = "devtools-mcp-modal-root";
+      root.className = "devtools-mcp-modal";
+      root.setAttribute("role", "presentation");
 
-    const panel = document.createElement("div");
-    panel.className = "devtools-mcp-modal-panel";
-    panel.setAttribute("role", "dialog");
-    panel.setAttribute("aria-modal", "true");
+      const panel = document.createElement("div");
+      panel.className = "devtools-mcp-modal-panel";
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-modal", "true");
 
-    const h2 = document.createElement("h2");
-    h2.textContent = title;
+      const body = document.createElement("div");
+      body.className = "devtools-mcp-modal-body";
 
-    const body = document.createElement("div");
-    body.className = "devtools-mcp-modal-body";
+      const labPrompt = document.createElement("label");
+      labPrompt.htmlFor = "devtools-mcp-prompt-input";
+      labPrompt.textContent = "修改指令";
 
-    const labPrompt = document.createElement("label");
-    labPrompt.htmlFor = "devtools-mcp-prompt-input";
-    labPrompt.textContent = "修改指令";
+      const ta = document.createElement("textarea");
+      ta.id = "devtools-mcp-prompt-input";
+      ta.rows = 4;
+      ta.placeholder = "描述你希望 AI 如何修改当前选中的 DOM…";
 
-    const ta = document.createElement("textarea");
-    ta.id = "devtools-mcp-prompt-input";
-    ta.rows = 4;
-    ta.placeholder = "描述你希望 AI 如何修改当前选中的 DOM…";
+      const toggleRow = document.createElement("div");
+      toggleRow.className = "devtools-mcp-toggle-row";
 
-    const toggleRow = document.createElement("div");
-    toggleRow.className = "devtools-mcp-toggle-row";
+      const pollCb = document.createElement("input");
+      pollCb.type = "checkbox";
+      pollCb.checked = initialPoll === true;
+      pollCb.id = "devtools-mcp-poll-toggle";
 
-    const pollCb = document.createElement("input");
-    pollCb.type = "checkbox";
-    pollCb.checked = initialPoll === true;
-    pollCb.id = "devtools-mcp-poll-toggle";
+      const toggleText = document.createElement("span");
+      const strong = document.createElement("strong");
+      strong.textContent = "Claude → 浏览器";
+      toggleText.appendChild(strong);
+      toggleText.appendChild(
+        document.createTextNode(
+          " 开启后扩展会轮询本地服务并自动执行 AI 下发的页面操作步骤（测试/回放）。",
+        ),
+      );
 
-    const toggleText = document.createElement("span");
-    const strong = document.createElement("strong");
-    strong.textContent = "Claude → 浏览器";
-    toggleText.appendChild(strong);
-    toggleText.appendChild(
-      document.createTextNode(
-        " 开启后扩展会轮询本地服务并自动执行 AI 下发的页面操作步骤（测试/回放）。",
-      ),
-    );
+      toggleRow.appendChild(pollCb);
+      toggleRow.appendChild(toggleText);
 
-    toggleRow.appendChild(pollCb);
-    toggleRow.appendChild(toggleText);
+      body.appendChild(labPrompt);
+      body.appendChild(ta);
+      body.appendChild(toggleRow);
 
-    body.appendChild(labPrompt);
-    body.appendChild(ta);
-    body.appendChild(toggleRow);
+      const actions = document.createElement("div");
+      actions.className = "devtools-mcp-modal-actions";
 
-    const actions = document.createElement("div");
-    actions.className = "devtools-mcp-modal-actions";
+      const btnCancel = document.createElement("button");
+      btnCancel.type = "button";
+      btnCancel.className = "devtools-mcp-btn-secondary";
+      btnCancel.textContent = "取消";
 
-    const btnCancel = document.createElement("button");
-    btnCancel.type = "button";
-    btnCancel.className = "devtools-mcp-btn-secondary";
-    btnCancel.textContent = "取消";
+      const btnOk = document.createElement("button");
+      btnOk.type = "button";
+      btnOk.className = "devtools-mcp-btn-primary";
+      btnOk.textContent = "确定";
 
-    const btnOk = document.createElement("button");
-    btnOk.type = "button";
-    btnOk.className = "devtools-mcp-btn-primary";
-    btnOk.textContent = "确定";
+      actions.appendChild(btnCancel);
+      actions.appendChild(btnOk);
 
-    actions.appendChild(btnCancel);
-    actions.appendChild(btnOk);
+      panel.appendChild(body);
+      panel.appendChild(actions);
+      root.appendChild(panel);
+      document.documentElement.appendChild(root);
 
-    panel.appendChild(h2);
-    panel.appendChild(body);
-    panel.appendChild(actions);
-    root.appendChild(panel);
-    document.documentElement.appendChild(root);
-
-    function cleanup() {
-      root.remove();
-      document.removeEventListener("keydown", onKey, true);
-    }
-
-    function finish(cancelled) {
-      cleanup();
-      resolve({
-        text: cancelled ? "" : ta.value.trim(),
-        pollEnabled: !!pollCb.checked,
-        cancelled,
-      });
-    }
-
-    function onKey(e) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        finish(true);
+      function cleanup() {
+        root.remove();
+        document.removeEventListener("keydown", onKey, true);
       }
-    }
 
-    document.addEventListener("keydown", onKey, true);
+      function finish(cancelled) {
+        cleanup();
+        resolve({
+          text: cancelled ? "" : ta.value.trim(),
+          pollEnabled: !!pollCb.checked,
+          cancelled,
+        });
+      }
 
-    root.addEventListener("click", (e) => {
-      if (e.target === root) finish(true);
-    });
-    panel.addEventListener("click", (e) => e.stopPropagation());
+      function onKey(e) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          finish(true);
+        }
+      }
 
-    btnCancel.addEventListener("click", () => finish(true));
-    btnOk.addEventListener("click", () => finish(false));
+      document.addEventListener("keydown", onKey, true);
 
-    requestAnimationFrame(() => {
-      ta.focus();
-    });
+      root.addEventListener("click", (e) => {
+        if (e.target === root) finish(true);
+      });
+      panel.addEventListener("click", (e) => e.stopPropagation());
+
+      btnCancel.addEventListener("click", () => finish(true));
+      btnOk.addEventListener("click", () => finish(false));
+
+      requestAnimationFrame(() => {
+        ta.focus();
+      });
     });
   });
 }
 
 async function loadPollEnabled() {
   const data = await chrome.storage.local.get(STORAGE_POLL_ENABLED_KEY);
-  if (typeof data[STORAGE_POLL_ENABLED_KEY] === "boolean") return data[STORAGE_POLL_ENABLED_KEY];
+  if (typeof data[STORAGE_POLL_ENABLED_KEY] === "boolean")
+    return data[STORAGE_POLL_ENABLED_KEY];
   return false;
 }
 
@@ -221,36 +217,36 @@ function showToast(message) {
 }
 
 // 监听页面错误
-window.addEventListener('error', (e) => {
+window.addEventListener("error", (e) => {
   const body = {
-    type: 'page_error',
+    type: "page_error",
     message: e.message,
     filename: e.filename,
     line: e.lineno,
     col: e.colno,
     stack: e.error?.stack,
-    url: location.href
+    url: location.href,
   };
-  logOutgoingToServer('上报 page_error → /from-devtools', body);
+  logOutgoingToServer("上报 page_error → /from-devtools", body);
   fetch(`${DEVTOOLS_HTTP_BASE}/from-devtools`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   }).catch(() => {});
 });
 
-window.addEventListener('unhandledrejection', (e) => {
+window.addEventListener("unhandledrejection", (e) => {
   const body = {
-    type: 'unhandled_rejection',
-    message: String(e.reason?.message || e.reason || 'unknown'),
+    type: "unhandled_rejection",
+    message: String(e.reason?.message || e.reason || "unknown"),
     stack: e.reason?.stack,
-    url: location.href
+    url: location.href,
   };
-  logOutgoingToServer('上报 unhandledrejection → /from-devtools', body);
+  logOutgoingToServer("上报 unhandledrejection → /from-devtools", body);
   fetch(`${DEVTOOLS_HTTP_BASE}/from-devtools`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   }).catch(() => {});
 });
 
@@ -316,37 +312,37 @@ async function pollAndRunTestSteps() {
     const results = [];
     for (const step of steps) {
       try {
-        if (step.action === 'click') {
+        if (step.action === "click") {
           const el = document.querySelector(step.selector);
           el?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
           el?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
           el?.click();
           el?.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-        } else if (step.action === 'fill') {
+        } else if (step.action === "fill") {
           const el = document.querySelector(step.selector);
           if (el) {
             el.focus?.();
-            el.value = step.value || '';
+            el.value = step.value || "";
             el.dispatchEvent(new Event("input", { bubbles: true }));
             el.dispatchEvent(new Event("change", { bubbles: true }));
           }
-        } else if (step.action === 'check') {
+        } else if (step.action === "check") {
           const el = document.querySelector(step.selector);
           if (el) {
             el.checked = true;
             el.dispatchEvent(new Event("input", { bubbles: true }));
             el.dispatchEvent(new Event("change", { bubbles: true }));
           }
-        } else if (step.action === 'uncheck') {
+        } else if (step.action === "uncheck") {
           const el = document.querySelector(step.selector);
           if (el) {
             el.checked = false;
             el.dispatchEvent(new Event("input", { bubbles: true }));
             el.dispatchEvent(new Event("change", { bubbles: true }));
           }
-        } else if (step.action === 'focus') {
+        } else if (step.action === "focus") {
           document.querySelector(step.selector)?.focus();
-        } else if (step.action === 'navigate') {
+        } else if (step.action === "navigate") {
           window.location.href = step.url;
         }
         results.push({ ...step, success: true });
@@ -358,9 +354,9 @@ async function pollAndRunTestSteps() {
     console.log("[DevTools MCP] Claude→浏览器 执行结果", results);
 
     await fetch(`${DEVTOOLS_HTTP_BASE}/browser-test-result`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ results })
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ results }),
     });
     return true;
   } catch (err) {
@@ -417,7 +413,8 @@ loadPollEnabled()
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
-  if (!Object.prototype.hasOwnProperty.call(changes, STORAGE_POLL_ENABLED_KEY)) return;
+  if (!Object.prototype.hasOwnProperty.call(changes, STORAGE_POLL_ENABLED_KEY))
+    return;
   const next = changes[STORAGE_POLL_ENABLED_KEY].newValue;
   if (typeof next === "boolean") applyPollEnabled(next);
 });

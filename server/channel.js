@@ -35,7 +35,7 @@ const server = new Server(
       },
     },
     instructions:
-      "浏览器 DevTools 桥接事件通过 channel 推送。内容通常是 JSON：包含 dom、prompt、url、selector、type 等字段。收到后请根据用户意图处理（分析 DOM、定位元素、修改代码等）。",
+      "浏览器 DevTools 桥接事件通过 channel 推送。内容通常是 JSON：包含 dom、prompt、url、selector、sourceHints（开发模式下 React / Vue2 `vue2_sfc` / Vue3 `vue_sfc` 等尽力提供的源码路径线索）、type 等字段。收到后请根据用户意图处理（分析 DOM、定位元素、修改代码等）。",
   },
 );
 

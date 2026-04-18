@@ -1,6 +1,23 @@
 {
   "name": "devtools-mcp-server",
   "version": "1.0.0",
+  "description": "Bidirectional DevTools bridge for Claude CLI - send prompts to AI & replay Playwright actions in browser",
+  "author": "Toby Zhang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tobyzhang/devtools-mcp-cli"
+  },
+  "keywords": [
+    "devtools",
+    "claude",
+    "claude-code",
+    "mcp",
+    "playwright",
+    "e2e",
+    "testing",
+    "automation"
+  ],
   "scripts": {
     "start:mcp": "node mcp.js",
     "start:http": "node http.js",

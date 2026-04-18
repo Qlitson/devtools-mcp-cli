@@ -3,3 +3,7 @@ node_modules
 *.log
 .mcp.json
 server/.runtime/
+.idea/
+*.swp
+.env
+.env.local

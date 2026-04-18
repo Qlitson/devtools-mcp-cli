@@ -52,26 +52,7 @@ function mountDevToolsUiStyles() {
   if (document.getElementById("devtools-mcp-ui-styles")) return;
   const style = document.createElement("style");
   style.id = "devtools-mcp-ui-styles";
-  style.textContent = `
-    .devtools-mcp-toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483646;background:#111;color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;max-width:min(560px,calc(100% - 32px));box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;transition:opacity .18s ease}
-    .devtools-mcp-toast.show{opacity:1}
-    .devtools-mcp-modal{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45);backdrop-filter:saturate(1.2) blur(2px);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-    .devtools-mcp-modal-panel{width:min(440px,calc(100vw - 40px));max-height:min(520px,calc(100vh - 40px));overflow:auto;background:#1a1a1a;color:#eee;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}
-    .devtools-mcp-modal-body{padding:18px 18px 0}
-    .devtools-mcp-modal-body label{display:block;font-size:12px;color:#9ca3af;margin-bottom:6px}
-    .devtools-mcp-modal-body textarea{width:100%;min-height:100px;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:#111;color:#eee;font-size:14px;line-height:1.45;resize:vertical}
-    .devtools-mcp-modal-body textarea:focus{outline:none;border-color:rgba(99,102,241,.65);box-shadow:0 0 0 2px rgba(99,102,241,.2)}
-    .devtools-mcp-toggle-row{display:flex;align-items:flex-start;gap:10px;margin-top:16px;padding:12px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
-    .devtools-mcp-toggle-row input{flex-shrink:0;width:18px;height:18px;margin-top:2px;accent-color:#6366f1;cursor:pointer}
-    .devtools-mcp-toggle-row span{font-size:13px;line-height:1.45;color:#d1d5db}
-    .devtools-mcp-toggle-row strong{color:#f3f4f6;display:block;margin-bottom:2px;font-size:13px}
-    .devtools-mcp-modal-actions{display:flex;justify-content:flex-end;gap:10px;padding:16px 18px 18px}
-    .devtools-mcp-modal-actions button{font-size:14px;padding:8px 16px;border-radius:8px;cursor:pointer;border:1px solid transparent}
-    .devtools-mcp-btn-secondary{background:transparent;color:#d1d5db;border-color:rgba(255,255,255,.15)}
-    .devtools-mcp-btn-secondary:hover{background:rgba(255,255,255,.06)}
-    .devtools-mcp-btn-primary{background:#6366f1;color:#fff;border-color:#6366f1}
-    .devtools-mcp-btn-primary:hover{filter:brightness(1.06)}
-  `;
+  style.textContent = `.devtools-mcp-toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483646;background:#111;color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;max-width:min(560px,calc(100% - 32px));box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;transition:opacity .18s ease}.devtools-mcp-toast.show{opacity:1}.devtools-mcp-modal{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45);backdrop-filter:saturate(1.2) blur(2px);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}.devtools-mcp-modal-panel{width:min(440px,calc(100vw - 40px));max-height:min(520px,calc(100vh - 40px));overflow:auto;background:#1a1a1a;color:#eee;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}.devtools-mcp-modal-body{padding:18px 18px 0}.devtools-mcp-modal-body label{display:block;font-size:12px;color:#9ca3af;margin-bottom:6px}.devtools-mcp-modal-body textarea{width:100%;min-height:100px;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:#111;color:#eee;font-size:14px;line-height:1.45;resize:vertical}.devtools-mcp-modal-body textarea:focus{outline:none;border-color:rgba(99,102,241,.65);box-shadow:0 0 0 2px rgba(99,102,241,.2)}.devtools-mcp-toggle-row{display:flex;align-items:flex-start;gap:10px;margin-top:16px;padding:12px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}.devtools-mcp-toggle-row input{flex-shrink:0;width:18px;height:18px;margin-top:2px;accent-color:#6366f1;cursor:pointer}.devtools-mcp-toggle-row span{font-size:13px;line-height:1.45;color:#d1d5db}.devtools-mcp-toggle-row strong{color:#f3f4f6;display:block;margin-bottom:2px;font-size:13px}.devtools-mcp-modal-actions{display:flex;justify-content:flex-end;gap:10px;padding:16px 18px 18px}.devtools-mcp-modal-actions button{font-size:14px;padding:8px 16px;border-radius:8px;cursor:pointer;border:1px solid transparent}.devtools-mcp-btn-secondary{background:transparent;color:#d1d5db;border-color:rgba(255,255,255,.15)}.devtools-mcp-btn-secondary:hover{background:rgba(255,255,255,.06)}.devtools-mcp-btn-primary{background:#6366f1;color:#fff;border-color:#6366f1}.devtools-mcp-btn-primary:hover{filter:brightness(1.06)}`;
   document.documentElement.appendChild(style);
 }
 

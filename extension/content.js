@@ -252,8 +252,10 @@ async function applyPollEnabled(enabled) {
     isPolling = false;
     failureCount = 0;
     emptyPollStreak = 0;
+    stopMcpConsolePoll();
     return;
   }
+  startMcpConsolePoll();
   scheduleNextPoll(300);
 }
 
@@ -412,7 +414,14 @@ function startMcpConsolePoll() {
   pollMcpConsoleLines();
 }
 
+function stopMcpConsolePoll() {
+  if (mcpConsoleTimer == null) return;
+  clearInterval(mcpConsoleTimer);
+  mcpConsoleTimer = null;
+}
+
 async function pollMcpConsoleLines() {
+  if (!pollStepsEnabled) return;
   if (!navigator.onLine) return;
   try {
     const res = await fetch(`${DEVTOOLS_HTTP_BASE}/get-mcp-console`);
@@ -439,5 +448,3 @@ async function pollMcpConsoleLines() {
     /* 离线或未启动本地服务 */
   }
 }
-
-startMcpConsolePoll();

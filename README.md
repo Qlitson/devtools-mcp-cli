@@ -99,7 +99,8 @@ claude
 3. **让 Claude 真正开始消费队列**（否则扩展写入的任务会一直积在 `state.json`）：在对话里明确要求它**反复或阻塞式**调用 MCP，例如：
 
    - 单次查看：`请调用 getDevToolsTask，若有任务则根据其中的 dom / prompt 处理。`  
-   - 持续拉取（更贴近「激活监听」）：`请在一个循环里多次调用 waitForDevToolsTask（例如 timeout 30s、间隔 300ms），直到取到来自浏览器的任务再回复我；之后若我继续在网页里发送，请继续用同样方式拉取。`
+   - 持续拉取（更贴近「激活监听」）：`请在一个循环里多次调用 waitForDevToolsTask（例如 timeout 30s、间隔 300ms），直到取到来自浏览器的任务再回复我；之后若我继续在网页里发送，请继续用同样方式拉取。`  
+   - **收尾**：每处理完一轮浏览器相关任务（含分析 `dom`、调用 `/set-browser-test-steps`、阅读执行结果等）后，调用 MCP 工具 **`clearDevToolsBridge`**，清空 `lastTask` 与待执行步骤队列，避免下次 `getDevToolsTask` / `waitForDevToolsTask` 读到陈旧数据。
 
    也可把上述约定写进项目根 **`CLAUDE.md`** 或 **Cursor/Claude 项目规则**，这样每次开会话不必手动重复说明。
 

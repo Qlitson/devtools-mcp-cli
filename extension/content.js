@@ -288,7 +288,7 @@ async function pollAndRunTestSteps() {
       throw new Error(`poll_failed_${res.status}`);
     }
     const steps = await res.json();
-    if (!steps || steps.length === 0) return false;
+    if (!Array.isArray(steps) || steps.length === 0) return false;
 
     const results = [];
     for (const step of steps) {

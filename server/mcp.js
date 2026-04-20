@@ -3,7 +3,11 @@ const {
   StdioServerTransport,
 } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const z = require("zod");
-const { popLastTask, tryPopLastTask } = require("./state");
+const {
+  popLastTask,
+  tryPopLastTask,
+  clearDevToolsBridgeQueues,
+} = require("./state");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -105,6 +109,32 @@ mcpServer.registerTool(
         task: null,
         timedOut: true,
         waitedMs,
+      },
+    };
+  },
+);
+
+mcpServer.registerTool(
+  "clearDevToolsBridge",
+  {
+    description:
+      "Call after you finish handling a DevTools/browser task (including after set-browser-test-steps flow and browser feedback). Clears lastTask and any pending browser test steps so the next getDevToolsTask/waitForDevToolsTask does not see stale queue data.",
+    inputSchema: z.object({}),
+    outputSchema: z.object({
+      ok: z.literal(true),
+    }),
+  },
+  async () => {
+    await clearDevToolsBridgeQueues();
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ ok: true }, null, 2),
+        },
+      ],
+      structuredContent: {
+        ok: true,
       },
     };
   },

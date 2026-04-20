@@ -15,6 +15,20 @@ async function ensureRuntimeDir() {
   await fs.mkdir(RUNTIME_DIR, { recursive: true });
 }
 
+/**
+ * 无有效 dom / prompt 的请求视为空任务：不写入队列、pop 时丢弃。
+ * （page_error / unhandled_rejection 不应出现在 lastTask，若出现则不算空，便于排查。）
+ */
+function isEmptyDevToolsTask(task) {
+  if (task == null) return true;
+  if (typeof task !== "object" || Array.isArray(task)) return true;
+  const type = task.type;
+  if (type === "page_error" || type === "unhandled_rejection") return false;
+  const prompt = typeof task.prompt === "string" ? task.prompt.trim() : "";
+  const dom = typeof task.dom === "string" ? task.dom.trim() : "";
+  return !prompt && !dom;
+}
+
 async function readState() {
   await ensureRuntimeDir();
   try {
@@ -52,6 +66,13 @@ async function updateState(updater) {
 }
 
 async function setLastTask(task) {
+  if (isEmptyDevToolsTask(task)) {
+    await updateState((state) => ({
+      ...state,
+      lastTask: null,
+    }));
+    return;
+  }
   await updateState((state) => ({
     ...state,
     lastTask: task,
@@ -74,7 +95,15 @@ async function appendDiagnostic(entry) {
 async function popLastTask() {
   let task = null;
   await updateState((state) => {
-    task = state.lastTask ?? null;
+    const raw = state.lastTask ?? null;
+    if (raw != null && isEmptyDevToolsTask(raw)) {
+      task = null;
+      return {
+        ...state,
+        lastTask: null,
+      };
+    }
+    task = raw;
     return {
       ...state,
       lastTask: null,
@@ -90,14 +119,30 @@ async function popLastTask() {
 async function tryPopLastTask() {
   let task = null;
   await updateState((state) => {
-    task = state.lastTask ?? null;
-    if (!task) return state;
+    const raw = state.lastTask ?? null;
+    if (!raw) return state;
+    if (isEmptyDevToolsTask(raw)) {
+      return {
+        ...state,
+        lastTask: null,
+      };
+    }
+    task = raw;
     return {
       ...state,
       lastTask: null,
     };
   });
   return task;
+}
+
+/** Claude 完成一轮浏览器侧工作后调用 MCP 工具清空，避免下次拉取到陈旧任务/步骤 */
+async function clearDevToolsBridgeQueues() {
+  await updateState((state) => ({
+    ...state,
+    lastTask: null,
+    browserTestSteps: [],
+  }));
 }
 
 async function setBrowserTestSteps(steps) {
@@ -122,6 +167,8 @@ async function popBrowserTestSteps() {
 module.exports = {
   setLastTask,
   appendDiagnostic,
+  isEmptyDevToolsTask,
+  clearDevToolsBridgeQueues,
   popLastTask,
   tryPopLastTask,
   setBrowserTestSteps,

@@ -2,6 +2,7 @@ const express = require("express");
 const {
   setLastTask,
   appendDiagnostic,
+  isEmptyDevToolsTask,
   setBrowserTestSteps,
   popBrowserTestSteps,
 } = require("./state");
@@ -32,6 +33,11 @@ app.post("/from-devtools", async (req, res) => {
       message: String(req.body?.message || "").slice(0, 200),
     });
   } else {
+    if (isEmptyDevToolsTask(req.body)) {
+      await setLastTask(null);
+      res.json({ ok: true, skipped: true });
+      return;
+    }
     await setLastTask(req.body);
     const selector = req.body?.selector || "";
     const prompt = req.body?.prompt ? String(req.body.prompt).slice(0, 120) : "";
@@ -47,8 +53,15 @@ app.post("/from-devtools", async (req, res) => {
 });
 
 app.post("/set-browser-test-steps", async (req, res) => {
-  await setBrowserTestSteps(req.body?.steps);
-  console.log("📥 已收到浏览器测试步骤");
+  const steps = req.body?.steps;
+  if (!Array.isArray(steps)) {
+    res.status(400).json({ ok: false, error: "steps_must_be_array" });
+    return;
+  }
+  await setBrowserTestSteps(steps);
+  console.log(
+    steps.length ? "📥 已收到浏览器测试步骤" : "📥 已清空浏览器测试步骤队列",
+  );
   res.json({ ok: true });
 });
 

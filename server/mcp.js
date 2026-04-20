@@ -127,6 +127,11 @@ mcpServer.registerTool(
         .min(1)
         .max(100_000)
         .describe("Text to print in the browser page console under [Claude]."),
+      pageUrl: z
+        .string()
+        .min(1)
+        .max(4000)
+        .describe("Exact page URL to receive this console line."),
       level: z
         .enum(["log", "warn", "error", "info"])
         .optional()
@@ -137,8 +142,8 @@ mcpServer.registerTool(
       queued: z.number().int(),
     }),
   },
-  async ({ message, level = "log" }) => {
-    await appendMcpConsoleLine({ text: message, level });
+  async ({ message, pageUrl, level = "log" }) => {
+    await appendMcpConsoleLine({ text: message, targetUrl: pageUrl, level });
     return {
       content: [
         {

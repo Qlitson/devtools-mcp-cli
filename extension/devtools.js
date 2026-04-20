@@ -8,11 +8,11 @@
 const PORT_NAME = "devtools-mcp-bridge";
 const SNAPSHOT_MAX_AGE_MS = 120_000;
 
-/** @type {{ ok: boolean, html: string, url: string, ts: number, sourceHints?: unknown[] } | null} */
+/** @type {{ ok: boolean, elementFeatures: object, url: string, ts: number, sourceHints?: unknown[] } | null} */
 let lastSelectionSnapshot = null;
 
 /**
- * 在页面主世界执行：除 outerHTML 外尽量收集「源码位置」线索。
+ * 在页面主世界执行：只收集「元素特征」与源码线索，不传整段 DOM 文本。
  * 说明：Source Map 只映射「打包 JS 行列 → 源码行列」，无法从任意 DOM 反查文件；
  * 开发模式下 React / Vue2 / Vue3 会在内部结构里挂源码路径（不等同于解析 .map 文件）。
  */
@@ -108,9 +108,28 @@ function buildDollar0EvalExpression() {
         }
       } catch (ignored) {}
     })(el);
+    var text = "";
+    try { text = String(el.innerText || el.textContent || "").replace(/\\s+/g, " ").trim(); } catch (ignored) {}
+    if (text.length > 200) text = text.slice(0, 200);
+    var attrs = {};
+    try {
+      var attrList = ["type", "name", "role", "aria-label", "title", "placeholder", "value", "href", "src"];
+      var ai, an, av;
+      for (ai = 0; ai < attrList.length; ai++) {
+        an = attrList[ai];
+        av = el.getAttribute && el.getAttribute(an);
+        if (av != null && av !== "") attrs[an] = String(av).slice(0, 300);
+      }
+    } catch (ignored) {}
     return {
       ok: true,
-      html: el.outerHTML,
+      elementFeatures: {
+        tag: String(el.tagName || "").toLowerCase(),
+        id: el.id ? String(el.id).slice(0, 200) : "",
+        className: el.className ? String(el.className).slice(0, 400) : "",
+        text: text,
+        attrs: attrs
+      },
       url: String(location.href || ""),
       selector: "",
       source: "devtools_$0",
@@ -127,10 +146,10 @@ function evalDollar0(callback) {
 }
 
 function rememberSnapshotFromResult(result) {
-  if (!result || !result.ok || typeof result.html !== "string" || !result.html) return;
+  if (!result || !result.ok || !result.elementFeatures) return;
   lastSelectionSnapshot = {
     ok: true,
-    html: result.html,
+    elementFeatures: result.elementFeatures,
     url: typeof result.url === "string" ? result.url : "",
     ts: Date.now(),
     sourceHints: Array.isArray(result.sourceHints) ? result.sourceHints : [],
@@ -194,7 +213,7 @@ function onGetElementsSelectionMessage(msg) {
         ? result
         : { ok: false, reason: "bad_eval_result" };
 
-    if (normalized.ok && normalized.html) {
+    if (normalized.ok && normalized.elementFeatures) {
       rememberSnapshotFromResult(normalized);
       replySelection(msg.id, normalized);
       return;
@@ -221,12 +240,12 @@ function tryFallbackSnapshot(requestId, liveReason) {
   if (
     snap &&
     snap.ok &&
-    snap.html &&
+    snap.elementFeatures &&
     Date.now() - snap.ts < SNAPSHOT_MAX_AGE_MS
   ) {
     replySelection(requestId, {
       ok: true,
-      html: snap.html,
+      elementFeatures: snap.elementFeatures,
       url: snap.url || "",
       selector: "",
       source: "devtools_$0_snapshot",

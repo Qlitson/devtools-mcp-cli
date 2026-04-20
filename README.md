@@ -105,7 +105,7 @@ claude
 ```
 
 - 进入会话后，确认工具列表里能看到 **`getDevToolsTask`** / **`waitForDevToolsTask`** / **`postToDevToolsConsole`** 等（说明 `mcp.js` 已由 Claude Code 拉起并连上）。若看不到，检查当前目录是否是该 MCP 所在项目、或 `claude mcp list` 是否包含 `devtools`。
-- **会话里的回复 ≠ 网页 Console**：Claude 在聊天窗口里的回答**不会自动**出现在浏览器 **DevTools → Console**。若要在**当前页面**的 Console 里看到说明（例如修改摘要），请在处理完 DevTools 任务后调用 MCP 工具 **`postToDevToolsConsole`**（传入 `message` 文本；可选 `level`：`log`/`warn`/`error`/`info`）。扩展会轮询本地服务的 **`GET /get-mcp-console`** 并打印为带 **`[Claude]`** 前缀的日志。
+- **会话里的回复 ≠ 网页 Console**：Claude 在聊天窗口里的回答**不会自动**出现在浏览器 **DevTools → Console**。若要在**当前页面**的 Console 里看到说明（例如修改摘要），请在处理完 DevTools 任务后调用 MCP 工具 **`postToDevToolsConsole`**（传入 `message` 和该任务的 `pageUrl`；可选 `level`：`log`/`warn`/`error`/`info`）。扩展会轮询本地服务的 **`GET /get-mcp-console?pageUrl=当前页`** 并打印为带 **`[Claude]`** 前缀的日志。
 
 3. **让 Claude 真正开始消费队列**（否则扩展写入的任务会一直积在 `state.json`）：在对话里明确要求它**反复或阻塞式**调用 MCP，例如：
    - 单次查看：`请调用 getDevToolsTask，若有任务则根据其中的 dom / prompt 处理。`

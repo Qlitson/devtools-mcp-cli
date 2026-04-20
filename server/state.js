@@ -29,7 +29,18 @@ function isEmptyDevToolsTask(task) {
   if (type === "page_error" || type === "unhandled_rejection") return false;
   const prompt = typeof task.prompt === "string" ? task.prompt.trim() : "";
   const dom = typeof task.dom === "string" ? task.dom.trim() : "";
-  return !prompt && !dom;
+  const hasFeatures =
+    task.elementFeatures &&
+    typeof task.elementFeatures === "object" &&
+    !Array.isArray(task.elementFeatures);
+  return !prompt && !dom && !hasFeatures;
+}
+
+function normalizeUrl(value) {
+  if (typeof value !== "string") return "";
+  const s = value.trim();
+  if (!s) return "";
+  return s.slice(0, 4000);
 }
 
 async function readState() {
@@ -59,12 +70,17 @@ async function writeState(state) {
 }
 
 async function updateState(updater) {
-  stateWriteChain = stateWriteChain.then(async () => {
-    const current = await readState();
-    const next = await updater(current);
-    await writeState(next);
-    return next;
-  });
+  stateWriteChain = stateWriteChain
+    .catch((err) => {
+      // 防止一次写入异常后 Promise 链永久 rejected，导致后续所有状态更新失效
+      console.error("stateWriteChain recovered from previous failure:", err);
+    })
+    .then(async () => {
+      const current = await readState();
+      const next = await updater(current);
+      await writeState(next);
+      return next;
+    });
   return stateWriteChain;
 }
 
@@ -153,11 +169,12 @@ async function clearDevToolsBridgeQueues() {
 async function appendMcpConsoleLine(entry) {
   const text = String(entry?.text ?? "").slice(0, 120_000);
   if (!text.trim()) return;
+  const targetUrl = normalizeUrl(entry?.targetUrl);
   const levelRaw = entry?.level;
   const level = ["log", "warn", "error", "info"].includes(levelRaw)
     ? levelRaw
     : "log";
-  const item = { text, level, ts: Date.now() };
+  const item = { text, level, targetUrl, ts: Date.now() };
   await updateState((state) => {
     const prev = Array.isArray(state.mcpConsoleLines) ? state.mcpConsoleLines : [];
     const next = [...prev, item].slice(-MAX_MCP_CONSOLE_LINES);
@@ -165,11 +182,21 @@ async function appendMcpConsoleLine(entry) {
   });
 }
 
-async function popAllMcpConsoleLines() {
+async function popMcpConsoleLinesForUrl(pageUrl) {
+  const page = normalizeUrl(pageUrl);
   let lines = [];
   await updateState((state) => {
-    lines = Array.isArray(state.mcpConsoleLines) ? state.mcpConsoleLines : [];
-    return { ...state, mcpConsoleLines: [] };
+    const all = Array.isArray(state.mcpConsoleLines) ? state.mcpConsoleLines : [];
+    const remain = [];
+    for (const line of all) {
+      const target = normalizeUrl(line?.targetUrl);
+      if (target && page && target === page) {
+        lines.push(line);
+      } else {
+        remain.push(line);
+      }
+    }
+    return { ...state, mcpConsoleLines: remain };
   });
   return lines;
 }
@@ -204,7 +231,7 @@ module.exports = {
   isEmptyDevToolsTask,
   clearDevToolsBridgeQueues,
   appendMcpConsoleLine,
-  popAllMcpConsoleLines,
+  popMcpConsoleLinesForUrl,
   popLastTask,
   tryPopLastTask,
   setBrowserTestSteps,

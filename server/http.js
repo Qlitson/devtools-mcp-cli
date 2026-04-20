@@ -5,7 +5,7 @@ const {
   isEmptyDevToolsTask,
   setBrowserTestSteps,
   popBrowserTestSteps,
-  popAllMcpConsoleLines,
+  popMcpConsoleLinesForUrl,
   getStateFilePath,
 } = require("./state");
 
@@ -72,8 +72,9 @@ app.get("/get-browser-test-steps", async (req, res) => {
   res.json(steps || []);
 });
 
-app.get("/get-mcp-console", async (_req, res) => {
-  const lines = await popAllMcpConsoleLines();
+app.get("/get-mcp-console", async (req, res) => {
+  const pageUrl = req.query?.pageUrl ? String(req.query.pageUrl) : "";
+  const lines = await popMcpConsoleLinesForUrl(pageUrl);
   res.json({ lines: lines || [] });
 });
 

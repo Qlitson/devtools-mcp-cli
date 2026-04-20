@@ -67,9 +67,9 @@ function requestElementsPanelSelection(tabId) {
 
 async function getTargetFromElementsPanel(tabId) {
   const raw = await requestElementsPanelSelection(tabId);
-  if (!raw || !raw.ok || typeof raw.html !== "string" || !raw.html) return null;
+  if (!raw || !raw.ok || !raw.elementFeatures) return null;
   return {
-    html: raw.html,
+    elementFeatures: raw.elementFeatures,
     url: typeof raw.url === "string" ? raw.url : "",
     selector: typeof raw.selector === "string" ? raw.selector : "",
     reason: raw.source || "devtools_$0",
@@ -82,10 +82,25 @@ function tabMessageOptions(info) {
   return { frameId: info.frameId };
 }
 
+function topFrameMessageOptions() {
+  return { frameId: 0 };
+}
+
 function truncateDomForLog(html, max = 800) {
   if (typeof html !== "string") return html;
   if (html.length <= max) return html;
   return `${html.slice(0, max)}…（共 ${html.length} 字符，已截断）`;
+}
+
+function buildFeatureSummary(features) {
+  if (!features || typeof features !== "object") return "";
+  const tag = features.tag ? String(features.tag).toLowerCase() : "element";
+  const id = features.id ? `#${String(features.id).slice(0, 80)}` : "";
+  const className = features.className
+    ? "." + String(features.className).trim().split(/\s+/).filter(Boolean).slice(0, 2).join(".")
+    : "";
+  const text = features.text ? ` text="${String(features.text).slice(0, 100)}"` : "";
+  return `<${tag}${id}${className}>${text}`;
 }
 
 async function sendTask(tabId, clickInfo = {}) {
@@ -93,8 +108,8 @@ async function sendTask(tabId, clickInfo = {}) {
   // 右键菜单只负责唤起输入框；DOM 一律来自 DevTools Elements 当前选中节点 $0。
   const target = await getTargetFromElementsPanel(tabId);
 
-  const html = target?.html || "";
-  if (!html) {
+  const featureSummary = buildFeatureSummary(target?.elementFeatures);
+  if (!featureSummary) {
     await toastInPage(
       tabId,
       "未捕获到目标。请先打开该标签页的 Chrome DevTools，在 Elements 面板中选中要修改的节点（$0），再点「发送到 Claude CLI」。若已打开 DevTools，请切换一下面板或刷新扩展后重试。",
@@ -108,7 +123,8 @@ async function sendTask(tabId, clickInfo = {}) {
   if (!promptText) return;
 
   const body = {
-    dom: html,
+    dom: featureSummary,
+    elementFeatures: target?.elementFeatures || null,
     prompt: promptText,
     url: target?.url || "",
     selector: target?.selector || "",
@@ -118,11 +134,15 @@ async function sendTask(tabId, clickInfo = {}) {
   const logPayload = { ...body, dom: truncateDomForLog(body.dom) };
   console.log("[DevTools MCP] 发送到本地服务", logPayload);
   await chrome.tabs
-    .sendMessage(tabId, {
-      type: "devtools:consoleLog",
-      label: "[DevTools MCP] 发送到本地服务",
-      payload: logPayload,
-    }, msgOpts)
+    .sendMessage(
+      tabId,
+      {
+        type: "devtools:consoleLog",
+        label: "[DevTools MCP] 发送到本地服务",
+        payload: logPayload,
+      },
+      topFrameMessageOptions(),
+    )
     .catch(() => null);
 
   try {

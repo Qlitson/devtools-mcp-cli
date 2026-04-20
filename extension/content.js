@@ -1,5 +1,6 @@
 const DEVTOOLS_HTTP_BASE = "http://127.0.0.1:55666";
 const STORAGE_POLL_ENABLED_KEY = "devtoolsPollStepsEnabled";
+const IS_TOP_WINDOW = window.top === window;
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "devtools:consoleLog") {
@@ -246,7 +247,7 @@ let pollStepsEnabled = false;
 
 async function applyPollEnabled(enabled) {
   pollStepsEnabled = !!enabled;
-  if (!pollStepsEnabled) {
+  if (!pollStepsEnabled || !IS_TOP_WINDOW) {
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
     isPolling = false;
@@ -348,7 +349,7 @@ async function pollAndRunTestSteps() {
 }
 
 async function runPollLoop() {
-  if (!pollStepsEnabled) return;
+  if (!IS_TOP_WINDOW || !pollStepsEnabled) return;
   if (isPolling) return;
   if (!navigator.onLine) {
     scheduleNextPoll(POLL_INTERVAL_HIDDEN_MS);
@@ -375,18 +376,18 @@ async function runPollLoop() {
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (!pollStepsEnabled) return;
+  if (!IS_TOP_WINDOW || !pollStepsEnabled) return;
   scheduleNextPoll(getNextPollDelay());
 });
 
 window.addEventListener("online", () => {
-  if (!pollStepsEnabled) return;
+  if (!IS_TOP_WINDOW || !pollStepsEnabled) return;
   failureCount = 0;
   scheduleNextPoll(300);
 });
 
 window.addEventListener("offline", () => {
-  if (!pollStepsEnabled) return;
+  if (!IS_TOP_WINDOW || !pollStepsEnabled) return;
   scheduleNextPoll(POLL_INTERVAL_HIDDEN_MS);
 });
 
@@ -407,6 +408,7 @@ const MCP_CONSOLE_POLL_MS = 2500;
 let mcpConsoleTimer = null;
 
 function startMcpConsolePoll() {
+  if (!IS_TOP_WINDOW || !pollStepsEnabled) return;
   if (mcpConsoleTimer != null) return;
   mcpConsoleTimer = setInterval(() => {
     pollMcpConsoleLines();
@@ -421,10 +423,11 @@ function stopMcpConsolePoll() {
 }
 
 async function pollMcpConsoleLines() {
-  if (!pollStepsEnabled) return;
+  if (!IS_TOP_WINDOW || !pollStepsEnabled) return;
   if (!navigator.onLine) return;
   try {
-    const res = await fetch(`${DEVTOOLS_HTTP_BASE}/get-mcp-console`);
+    const pageUrl = encodeURIComponent(location.href || "");
+    const res = await fetch(`${DEVTOOLS_HTTP_BASE}/get-mcp-console?pageUrl=${pageUrl}`);
     if (!res.ok) return;
     const data = await res.json();
     const lines = Array.isArray(data.lines) ? data.lines : [];

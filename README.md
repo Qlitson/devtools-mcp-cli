@@ -30,6 +30,7 @@ DevTools ↔ 本地服务 ↔ Claude CLI 双向打通
 补充：
 - `channel.js` 在推送的同时也会写入 `server/.runtime/state.json`，因此 **A 模式也可以并行使用 `mcp.js` 的工具**做队列消费/调试。
 - **不要同时**让 `channel.js` 与 `http.js` 监听同一个端口（默认分别是 `55666` / `55667`）。
+- **`server/.runtime/state.json` 何时会变**：只有在本机 **`http.js` / `channel.js` 的 HTTP`** 收到扩展 `POST /from-devtools`、或 **`mcp.js`** 执行 `getDevToolsTask` / `waitForDevToolsTask` / `clearDevToolsBridge`、或步骤/结果相关接口时才会读写。若你**只开 MCP、没开对应 HTTP**，或扩展仍指向 **`55666`** 却只跑了 **`http.js`（55667）**，文件会几乎不变。启动 `http.js` / `channel.js` / `mcp.js` 时终端会打印**本机绝对路径**，请与你在编辑器里打开的路径对比。该目录在 **`.gitignore`** 里，部分编辑器**不会自动刷新**已打开文件，可关掉重开或用 `cat`/`ls -la` 看修改时间。
 
 ## 🚀 快速开始（macOS）
 ### 1. 安装依赖
@@ -100,7 +101,7 @@ claude
 
    - 单次查看：`请调用 getDevToolsTask，若有任务则根据其中的 dom / prompt 处理。`  
    - 持续拉取（更贴近「激活监听」）：`请在一个循环里多次调用 waitForDevToolsTask（例如 timeout 30s、间隔 300ms），直到取到来自浏览器的任务再回复我；之后若我继续在网页里发送，请继续用同样方式拉取。`  
-   - **收尾**：每处理完一轮浏览器相关任务（含分析 `dom`、调用 `/set-browser-test-steps`、阅读执行结果等）后，调用 MCP 工具 **`clearDevToolsBridge`**，清空 `lastTask` 与待执行步骤队列，避免下次 `getDevToolsTask` / `waitForDevToolsTask` 读到陈旧数据。
+   - **收尾**：**一般不必**每轮手动调用 MCP。扩展在浏览器执行完步骤并 **`POST /browser-test-result`** 后，服务端会自动清空待执行步骤队列，避免下次轮询到陈旧步骤。若你发现 `lastTask` 或队列整体卡住，再使用 MCP 工具 **`clearDevToolsBridge`** 做一次全盘重置即可。
 
    也可把上述约定写进项目根 **`CLAUDE.md`** 或 **Cursor/Claude 项目规则**，这样每次开会话不必手动重复说明。
 

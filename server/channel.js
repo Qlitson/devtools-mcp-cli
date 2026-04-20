@@ -19,6 +19,7 @@ const {
   isEmptyDevToolsTask,
   setBrowserTestSteps,
   popBrowserTestSteps,
+  getStateFilePath,
 } = require("./state");
 
 const HTTP_HOST = process.env.DEVTOOLS_CHANNEL_HTTP_HOST || "127.0.0.1";
@@ -163,6 +164,7 @@ app.get("/get-browser-test-steps", async (req, res) => {
 
 app.post("/browser-test-result", async (req, res) => {
   console.log("📊 测试结果：", req.body);
+  await setBrowserTestSteps([]);
 
   const payload = JSON.stringify(req.body ?? {});
   await pushChannelEvent(payload, {
@@ -182,6 +184,7 @@ async function startHttp() {
   const addr = httpServer.address();
   console.log("Channel HTTP 已启动:", addr);
   console.log(`插件地址: http://${HTTP_HOST}:${HTTP_PORT}`);
+  console.log("状态文件（与 MCP 共用）:", getStateFilePath());
 
   httpServer.on("error", (err) => {
     console.error("Channel HTTP 异常，进程退出:", err);

@@ -7,6 +7,7 @@ const {
   popLastTask,
   tryPopLastTask,
   clearDevToolsBridgeQueues,
+  getStateFilePath,
 } = require("./state");
 
 function sleep(ms) {
@@ -118,7 +119,7 @@ mcpServer.registerTool(
   "clearDevToolsBridge",
   {
     description:
-      "Call after you finish handling a DevTools/browser task (including after set-browser-test-steps flow and browser feedback). Clears lastTask and any pending browser test steps so the next getDevToolsTask/waitForDevToolsTask does not see stale queue data.",
+      "Optional recovery: clears lastTask and pending browser test steps when the queue looks stuck. Normal workflows do not need this—pending steps are cleared automatically when the extension POSTs /browser-test-result.",
     inputSchema: z.object({}),
     outputSchema: z.object({
       ok: z.literal(true),
@@ -141,6 +142,7 @@ mcpServer.registerTool(
 );
 
 async function start() {
+  console.log("状态文件（MCP 与此文件读写同一队列）:", getStateFilePath());
   const transport = new StdioServerTransport();
   await mcpServer.connect(transport);
 }

@@ -5,6 +5,7 @@ const {
   isEmptyDevToolsTask,
   setBrowserTestSteps,
   popBrowserTestSteps,
+  getStateFilePath,
 } = require("./state");
 
 const app = express();
@@ -70,8 +71,9 @@ app.get("/get-browser-test-steps", async (req, res) => {
   res.json(steps || []);
 });
 
-app.post("/browser-test-result", (req, res) => {
+app.post("/browser-test-result", async (req, res) => {
   console.log("📊 测试结果：", req.body);
+  await setBrowserTestSteps([]);
   res.json({ ok: true });
 });
 
@@ -85,6 +87,7 @@ async function start() {
   const addr = httpServer.address();
   console.log("HTTP bridge 已启动:", addr);
   console.log(`服务地址: http://${HTTP_HOST}:${HTTP_PORT}`);
+  console.log("状态文件（扩展 POST 写入此文件）:", getStateFilePath());
 
   httpServer.on("error", (err) => {
     console.error("HTTP 服务运行异常，进程即将退出:", err);

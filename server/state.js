@@ -164,6 +164,11 @@ async function popBrowserTestSteps() {
   return steps;
 }
 
+/** 调试用：确认 HTTP / MCP / Channel 是否共用同一文件（应用目录下的 `server/.runtime/state.json`） */
+function getStateFilePath() {
+  return STATE_FILE;
+}
+
 module.exports = {
   setLastTask,
   appendDiagnostic,
@@ -174,4 +179,5 @@ module.exports = {
   setBrowserTestSteps,
   popBrowserTestSteps,
   readState,
+  getStateFilePath,
 };

@@ -5,6 +5,7 @@ const {
   isEmptyDevToolsTask,
   setBrowserTestSteps,
   popBrowserTestSteps,
+  popAllMcpConsoleLines,
   getStateFilePath,
 } = require("./state");
 
@@ -69,6 +70,11 @@ app.post("/set-browser-test-steps", async (req, res) => {
 app.get("/get-browser-test-steps", async (req, res) => {
   const steps = await popBrowserTestSteps();
   res.json(steps || []);
+});
+
+app.get("/get-mcp-console", async (_req, res) => {
+  const lines = await popAllMcpConsoleLines();
+  res.json({ lines: lines || [] });
 });
 
 app.post("/browser-test-result", async (req, res) => {

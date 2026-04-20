@@ -4,10 +4,13 @@ const path = require("path");
 const RUNTIME_DIR = path.join(__dirname, ".runtime");
 const STATE_FILE = path.join(RUNTIME_DIR, "state.json");
 
+const MAX_MCP_CONSOLE_LINES = 80;
+
 const EMPTY_STATE = {
   lastTask: null,
   browserTestSteps: [],
   diagnostics: [],
+  mcpConsoleLines: [],
 };
 let stateWriteChain = Promise.resolve();
 
@@ -142,7 +145,33 @@ async function clearDevToolsBridgeQueues() {
     ...state,
     lastTask: null,
     browserTestSteps: [],
+    mcpConsoleLines: [],
   }));
+}
+
+/** MCP：把要给用户在「页面 Console」里看到的文案入队（扩展轮询 GET /get-mcp-console 后打印） */
+async function appendMcpConsoleLine(entry) {
+  const text = String(entry?.text ?? "").slice(0, 120_000);
+  if (!text.trim()) return;
+  const levelRaw = entry?.level;
+  const level = ["log", "warn", "error", "info"].includes(levelRaw)
+    ? levelRaw
+    : "log";
+  const item = { text, level, ts: Date.now() };
+  await updateState((state) => {
+    const prev = Array.isArray(state.mcpConsoleLines) ? state.mcpConsoleLines : [];
+    const next = [...prev, item].slice(-MAX_MCP_CONSOLE_LINES);
+    return { ...state, mcpConsoleLines: next };
+  });
+}
+
+async function popAllMcpConsoleLines() {
+  let lines = [];
+  await updateState((state) => {
+    lines = Array.isArray(state.mcpConsoleLines) ? state.mcpConsoleLines : [];
+    return { ...state, mcpConsoleLines: [] };
+  });
+  return lines;
 }
 
 async function setBrowserTestSteps(steps) {
@@ -174,6 +203,8 @@ module.exports = {
   appendDiagnostic,
   isEmptyDevToolsTask,
   clearDevToolsBridgeQueues,
+  appendMcpConsoleLine,
+  popAllMcpConsoleLines,
   popLastTask,
   tryPopLastTask,
   setBrowserTestSteps,

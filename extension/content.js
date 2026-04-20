@@ -399,3 +399,45 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   const next = changes[STORAGE_POLL_ENABLED_KEY].newValue;
   if (typeof next === "boolean") applyPollEnabled(next);
 });
+
+/** Claude（MCP）→ 页面 Console：服务端队列 + 轮询拉取后打印（聊天内容不会自动进页面，需模型调用 postToDevToolsConsole） */
+const MCP_CONSOLE_POLL_MS = 2500;
+let mcpConsoleTimer = null;
+
+function startMcpConsolePoll() {
+  if (mcpConsoleTimer != null) return;
+  mcpConsoleTimer = setInterval(() => {
+    pollMcpConsoleLines();
+  }, MCP_CONSOLE_POLL_MS);
+  pollMcpConsoleLines();
+}
+
+async function pollMcpConsoleLines() {
+  if (!navigator.onLine) return;
+  try {
+    const res = await fetch(`${DEVTOOLS_HTTP_BASE}/get-mcp-console`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const lines = Array.isArray(data.lines) ? data.lines : [];
+    for (const line of lines) {
+      const text = line.text ?? "";
+      if (!text) continue;
+      const level = ["log", "warn", "error", "info"].includes(line.level)
+        ? line.level
+        : "log";
+      const fn =
+        typeof console[level] === "function" ? console[level] : console.log;
+      fn.call(
+        console,
+        "%c[Claude]%c",
+        "color:#6366f1;font-weight:600",
+        "color:inherit",
+        text,
+      );
+    }
+  } catch (_) {
+    /* 离线或未启动本地服务 */
+  }
+}
+
+startMcpConsolePoll();

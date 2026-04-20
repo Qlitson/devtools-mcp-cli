@@ -7,6 +7,7 @@ const {
   popLastTask,
   tryPopLastTask,
   clearDevToolsBridgeQueues,
+  appendMcpConsoleLine,
   getStateFilePath,
 } = require("./state");
 
@@ -110,6 +111,44 @@ mcpServer.registerTool(
         task: null,
         timedOut: true,
         waitedMs,
+      },
+    };
+  },
+);
+
+mcpServer.registerTool(
+  "postToDevToolsConsole",
+  {
+    description:
+      "Push text to the inspected page's DevTools Console (via extension polling). Chat replies do not appear in the browser automatically—call this with a short summary of your answer or fix so the developer sees it in the page console. Optional level: log | warn | error | info.",
+    inputSchema: z.object({
+      message: z
+        .string()
+        .min(1)
+        .max(100_000)
+        .describe("Text to print in the browser page console under [Claude]."),
+      level: z
+        .enum(["log", "warn", "error", "info"])
+        .optional()
+        .describe("Console method; default log."),
+    }),
+    outputSchema: z.object({
+      ok: z.literal(true),
+      queued: z.number().int(),
+    }),
+  },
+  async ({ message, level = "log" }) => {
+    await appendMcpConsoleLine({ text: message, level });
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ ok: true, queued: 1 }, null, 2),
+        },
+      ],
+      structuredContent: {
+        ok: true,
+        queued: 1,
       },
     };
   },

@@ -111,6 +111,18 @@ claude
    - 单次查看：`请调用 getDevToolsTask，若有任务则根据其中的 dom / prompt 处理。`
    - 持续拉取（更贴近「激活监听」）：`请在一个循环里多次调用 waitForDevToolsTask（例如 timeout 30s、间隔 3000ms），直到取到来自浏览器的任务再回复我；之后若我继续在网页里发送，请继续用同样方式拉取。`
    - **收尾**：**一般不必**每轮手动调用 MCP。扩展在浏览器执行完步骤并 **`POST /browser-test-result`** 后，服务端会自动清空待执行步骤队列，避免下次轮询到陈旧步骤。若你发现 `lastTask` 或队列整体卡住，再使用 MCP 工具 **`clearDevToolsBridge`** 做一次全盘重置即可。
+   - 已内置命令封装：可直接输入 **`/devtools-listen`** 唤醒“持续监听 + 自动处理”模式（命令文件在 `.claude/commands/devtools-listen.md`）。
+
+   命令用法（推荐）：
+
+   - 基础：`/devtools-listen`
+   - 带约束：`/devtools-listen 只处理当前页面`
+   - 停止：在会话里输入“停止监听”或其他明确停止指令
+
+   说明：
+   - 该命令会循环调用 `waitForDevToolsTask(timeout=30s, poll=300ms)`；
+   - 当任务为空或超时，会直接进入下一轮，不执行修改逻辑；
+   - 拿到任务后会按规则处理，并可通过 `postToDevToolsConsole` 把摘要输出到页面 Console。
 
    也可把上述约定写进项目根 **`CLAUDE.md`** 或 **Cursor/Claude 项目规则**，这样每次开会话不必手动重复说明。
 
